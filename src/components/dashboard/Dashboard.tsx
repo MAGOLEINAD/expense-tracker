@@ -15,7 +15,6 @@ import { MobileDateControls } from './layout/MobileDateControls';
 import { DatePickerPopover } from './navigation/DatePickerPopover';
 import { UsdRatePopover } from './info/UsdRatePopover';
 import { TemplateDialog } from './dialogs/TemplateDialog';
-import { MigrateDataFernando } from '@/components/admin/MigrateDataFernando';
 import type { Expense } from '@/types';
 
 export const Dashboard = () => {
