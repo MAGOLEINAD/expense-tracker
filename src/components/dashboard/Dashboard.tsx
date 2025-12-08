@@ -279,7 +279,7 @@ export const Dashboard = () => {
               />
             )}
             {activeTab === 1 && (
-              <Charts allExpenses={allExpenses} currentYear={selectedYear} categories={categories} />
+              <Charts allExpenses={allExpenses} currentYear={selectedYear} currentMonth={selectedMonth} categories={categories} />
             )}
           </>
         )}
