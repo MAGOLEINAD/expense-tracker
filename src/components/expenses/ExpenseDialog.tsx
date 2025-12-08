@@ -8,6 +8,8 @@ import {
   MenuItem,
   Box,
   Stack,
+  IconButton,
+  InputAdornment,
 } from '@mui/material';
 import { useState, useEffect } from 'react';
 import type { Expense, Currency, PaymentStatus, UserCategory } from '@/types';
@@ -16,6 +18,9 @@ import {
   PAYMENT_STATUS_LABELS,
 } from '@/utils';
 import { format } from 'date-fns';
+import { IconSelector } from './IconSelector';
+import * as MuiIcons from '@mui/icons-material';
+import SearchIcon from '@mui/icons-material/Search';
 
 interface ExpenseDialogProps {
   open: boolean;
@@ -46,6 +51,7 @@ export const ExpenseDialog = ({
 
   const [formData, setFormData] = useState<Partial<Expense>>({
     item: '',
+    icon: undefined,
     vto: format(new Date(), 'yyyy-MM-dd'),
     fechaPago: format(new Date(), 'yyyy-MM-dd'),
     importe: 0,
@@ -55,7 +61,11 @@ export const ExpenseDialog = ({
     category: defaultCategory,
     month: selectedMonth,
     year: selectedYear,
+    comment: undefined,
+    debt: undefined,
   });
+
+  const [iconSelectorOpen, setIconSelectorOpen] = useState(false);
 
   useEffect(() => {
     if (expense) {
@@ -70,6 +80,7 @@ export const ExpenseDialog = ({
       const newDefaultCategory = categories.length > 0 ? categories[0].id! : '';
       setFormData({
         item: '',
+        icon: undefined,
         vto: format(new Date(), 'yyyy-MM-dd'),
         fechaPago: format(new Date(), 'yyyy-MM-dd'),
         importe: 0,
@@ -79,9 +90,18 @@ export const ExpenseDialog = ({
         category: newDefaultCategory,
         month: selectedMonth,
         year: selectedYear,
+        comment: undefined,
+        debt: undefined,
       });
     }
   }, [expense, selectedMonth, selectedYear, categories]);
+
+  const handleSelectIcon = (iconName: string) => {
+    setFormData({ ...formData, icon: iconName });
+  };
+
+  // Obtener el componente de icono seleccionado
+  const SelectedIconComponent = formData.icon ? (MuiIcons as any)[formData.icon] : null;
 
   const handleSubmit = () => {
     onSave(formData);
@@ -107,13 +127,27 @@ export const ExpenseDialog = ({
             ))}
           </TextField>
 
-          <Box sx={{ display: 'flex', gap: 2 }}>
+          <Box sx={{ display: 'flex', gap: 2, alignItems: 'center' }}>
             <TextField
               fullWidth
               label="Item"
               value={formData.item}
               onChange={(e) => setFormData({ ...formData, item: e.target.value })}
+              InputProps={{
+                startAdornment: SelectedIconComponent && (
+                  <InputAdornment position="start">
+                    <SelectedIconComponent sx={{ color: '#2196f3' }} />
+                  </InputAdornment>
+                ),
+              }}
             />
+            <IconButton
+              onClick={() => setIconSelectorOpen(true)}
+              color="primary"
+              sx={{ flexShrink: 0 }}
+            >
+              <SearchIcon />
+            </IconButton>
             <TextField
               fullWidth
               label="Pagado Por"
@@ -176,6 +210,26 @@ export const ExpenseDialog = ({
               <MenuItem value="USD">USD</MenuItem>
             </TextField>
           </Box>
+
+          <TextField
+            fullWidth
+            type="number"
+            label="Deuda pendiente (opcional)"
+            value={formData.debt || ''}
+            onChange={(e) => setFormData({ ...formData, debt: e.target.value ? Number(e.target.value) : undefined })}
+            inputProps={{ step: '0.01', min: 0 }}
+            helperText="Ingresa el monto que aún debes de este gasto"
+          />
+
+          <TextField
+            fullWidth
+            multiline
+            rows={3}
+            label="Comentario (opcional)"
+            value={formData.comment || ''}
+            onChange={(e) => setFormData({ ...formData, comment: e.target.value || undefined })}
+            placeholder="Agrega un comentario sobre este gasto..."
+          />
         </Stack>
       </DialogContent>
       <DialogActions>
@@ -184,6 +238,13 @@ export const ExpenseDialog = ({
           Guardar
         </Button>
       </DialogActions>
+
+      <IconSelector
+        open={iconSelectorOpen}
+        selectedIcon={formData.icon}
+        onClose={() => setIconSelectorOpen(false)}
+        onSelect={handleSelectIcon}
+      />
     </Dialog>
   );
 };

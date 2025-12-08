@@ -9,6 +9,7 @@ export interface Expense {
   id?: string;
   userId: string;
   item: string;
+  icon?: string; // Icon name from Material UI
   vto: string; // Vencimiento
   fechaPago: string;
   importe: number;
@@ -18,6 +19,8 @@ export interface Expense {
   category: Category;
   month: number; // 1-12
   year: number;
+  comment?: string; // Optional comment
+  debt?: number; // Optional pending debt amount
   createdAt: Date;
   updatedAt: Date;
 }

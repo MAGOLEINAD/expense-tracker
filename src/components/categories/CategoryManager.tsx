@@ -13,6 +13,7 @@ import {
   Box,
   Typography,
   CircularProgress,
+  Alert,
 } from '@mui/material';
 import { Edit as EditIcon, Delete as DeleteIcon, Add as AddIcon } from '@mui/icons-material';
 import { useAuth } from '@/contexts/AuthContext';
@@ -33,6 +34,9 @@ export const CategoryManager = ({ open, onClose }: CategoryManagerProps) => {
   const [editingName, setEditingName] = useState('');
   const [newCategoryName, setNewCategoryName] = useState('');
   const [isAdding, setIsAdding] = useState(false);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [categoryToDelete, setCategoryToDelete] = useState<{ id: string; name: string } | null>(null);
+  const [expenseCount, setExpenseCount] = useState(0);
 
   const handleStartEdit = (id: string, currentName: string) => {
     setEditingId(id);
@@ -56,16 +60,43 @@ export const CategoryManager = ({ open, onClose }: CategoryManagerProps) => {
     setEditingName('');
   };
 
-  const handleDelete = async (id: string) => {
-    if (window.confirm('¿Estás seguro de eliminar esta categoría?')) {
-      try {
-        await deleteCategory(id);
-      } catch (error) {
-        if (error instanceof Error) {
+  const handleDelete = async (id: string, name: string) => {
+    try {
+      // Intentar borrar sin cascada para verificar si hay gastos
+      await deleteCategory(id, false);
+    } catch (error) {
+      if (error instanceof Error) {
+        // Si hay gastos asociados, mostrar diálogo de confirmación
+        const match = error.message.match(/(\d+) gasto/);
+        if (match) {
+          const count = parseInt(match[1]);
+          setExpenseCount(count);
+          setCategoryToDelete({ id, name });
+          setDeleteDialogOpen(true);
+        } else {
           alert(error.message);
         }
       }
     }
+  };
+
+  const confirmCascadeDelete = async () => {
+    if (!categoryToDelete) return;
+
+    try {
+      await deleteCategory(categoryToDelete.id, true);
+      setDeleteDialogOpen(false);
+      setCategoryToDelete(null);
+      setExpenseCount(0);
+    } catch (error) {
+      alert('Error al eliminar la categoría');
+    }
+  };
+
+  const cancelDelete = () => {
+    setDeleteDialogOpen(false);
+    setCategoryToDelete(null);
+    setExpenseCount(0);
   };
 
   const handleAddCategory = async () => {
@@ -118,7 +149,7 @@ export const CategoryManager = ({ open, onClose }: CategoryManagerProps) => {
                     >
                       <EditIcon />
                     </IconButton>
-                    <IconButton edge="end" onClick={() => handleDelete(category.id!)}>
+                    <IconButton edge="end" onClick={() => handleDelete(category.id!, category.name)}>
                       <DeleteIcon />
                     </IconButton>
                   </Box>
@@ -190,6 +221,36 @@ export const CategoryManager = ({ open, onClose }: CategoryManagerProps) => {
       <DialogActions>
         <Button onClick={onClose}>Cerrar</Button>
       </DialogActions>
+
+      {/* Diálogo de confirmación de borrado en cascada */}
+      <Dialog
+        open={deleteDialogOpen}
+        onClose={cancelDelete}
+        maxWidth="sm"
+        fullWidth
+      >
+        <DialogTitle>Confirmar eliminación</DialogTitle>
+        <DialogContent>
+          <Alert severity="warning" sx={{ mb: 2 }}>
+            La categoría <strong>{categoryToDelete?.name}</strong> tiene <strong>{expenseCount}</strong> gasto(s) asociado(s).
+          </Alert>
+          <Typography variant="body2" color="text.secondary">
+            Si eliminas esta categoría, también se eliminarán <strong>todos los gastos</strong> asociados a ella.
+            Esta acción no se puede deshacer.
+          </Typography>
+          <Typography variant="body2" color="error" sx={{ mt: 2, fontWeight: 600 }}>
+            ¿Estás seguro de que deseas continuar?
+          </Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={cancelDelete} color="inherit">
+            Cancelar
+          </Button>
+          <Button onClick={confirmCascadeDelete} color="error" variant="contained">
+            Eliminar categoría y {expenseCount} gasto(s)
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Dialog>
   );
 };

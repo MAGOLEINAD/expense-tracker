@@ -136,11 +136,11 @@ export const useCategories = (userId: string | undefined) => {
     }
   };
 
-  const deleteCategory = async (categoryId: string) => {
+  const deleteCategory = async (categoryId: string, cascadeDelete = false) => {
     if (!userId) return;
 
     try {
-      // Verificar que no haya gastos usando esta categoría
+      // Buscar gastos usando esta categoría
       const expensesQuery = query(
         collection(db, 'expenses'),
         where('userId', '==', userId),
@@ -148,16 +148,80 @@ export const useCategories = (userId: string | undefined) => {
       );
       const expensesSnapshot = await getDocs(expensesQuery);
 
-      if (!expensesSnapshot.empty) {
+      if (!expensesSnapshot.empty && !cascadeDelete) {
         throw new Error(
-          'No se puede eliminar una categoría que tiene gastos asociados'
+          `Esta categoría tiene ${expensesSnapshot.size} gasto(s) asociado(s). ¿Deseas eliminar la categoría y todos sus gastos?`
         );
       }
 
+      // Si cascadeDelete es true, eliminar todos los gastos asociados
+      if (cascadeDelete && !expensesSnapshot.empty) {
+        const deletePromises = expensesSnapshot.docs.map(expenseDoc =>
+          deleteDoc(doc(db, 'expenses', expenseDoc.id))
+        );
+        await Promise.all(deletePromises);
+      }
+
+      // Eliminar la categoría
       const categoryRef = doc(db, 'categories', categoryId);
       await deleteDoc(categoryRef);
     } catch (err) {
       console.error('Error deleting category:', err);
+      setError(err instanceof Error ? err.message : 'Error desconocido');
+      throw err;
+    }
+  };
+
+  const findOrphanedExpenses = async () => {
+    if (!userId) return [];
+
+    try {
+      // Obtener todos los gastos del usuario
+      const expensesQuery = query(
+        collection(db, 'expenses'),
+        where('userId', '==', userId)
+      );
+      const expensesSnapshot = await getDocs(expensesQuery);
+
+      // Crear un Set con los IDs de categorías existentes
+      const validCategoryIds = new Set(categories.map(cat => cat.id).filter(Boolean));
+
+      // Encontrar gastos con categorías que no existen
+      const orphanedExpenses = expensesSnapshot.docs
+        .filter(expenseDoc => {
+          const categoryId = expenseDoc.data().category;
+          return categoryId && !validCategoryIds.has(categoryId);
+        })
+        .map(expenseDoc => ({
+          id: expenseDoc.id,
+          ...expenseDoc.data(),
+        }));
+
+      return orphanedExpenses;
+    } catch (err) {
+      console.error('Error finding orphaned expenses:', err);
+      setError(err instanceof Error ? err.message : 'Error desconocido');
+      return [];
+    }
+  };
+
+  const cleanupOrphanedExpenses = async () => {
+    if (!userId) return 0;
+
+    try {
+      const orphaned = await findOrphanedExpenses();
+
+      if (orphaned.length === 0) return 0;
+
+      // Eliminar todos los gastos huérfanos
+      const deletePromises = orphaned.map(expense =>
+        deleteDoc(doc(db, 'expenses', expense.id as string))
+      );
+      await Promise.all(deletePromises);
+
+      return orphaned.length;
+    } catch (err) {
+      console.error('Error cleaning up orphaned expenses:', err);
       setError(err instanceof Error ? err.message : 'Error desconocido');
       throw err;
     }
@@ -171,5 +235,7 @@ export const useCategories = (userId: string | undefined) => {
     updateCategory,
     updateCategoryColors,
     deleteCategory,
+    findOrphanedExpenses,
+    cleanupOrphanedExpenses,
   };
 };

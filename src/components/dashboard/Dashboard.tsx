@@ -11,6 +11,7 @@ import { ConfirmDialog } from '@/components/common/ConfirmDialog';
 import { CategoryManager } from '@/components/categories/CategoryManager';
 import { MigrateData } from '@/components/admin/MigrateData';
 import { CleanupOldCategories } from '@/components/admin/CleanupOldCategories';
+import { CleanupOrphanedExpenses } from '@/components/admin/CleanupOrphanedExpenses';
 import { DashboardAppBar } from './layout/DashboardAppBar';
 import { MobileDrawer } from './layout/MobileDrawer';
 import { MobileDateControls } from './layout/MobileDateControls';
@@ -241,7 +242,9 @@ export const Dashboard = () => {
       />
 
       <Container maxWidth="xl" sx={{ py: isMobile ? 1 : 1.5, px: isMobile ? 1 : 2 }}>
-
+        {/* Herramientas de administración */}
+        {/* <CleanupOrphanedExpenses />
+        <CleanupOldCategories /> */}
 
         {isMobile && (
           <MobileDateControls

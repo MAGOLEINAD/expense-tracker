@@ -34,11 +34,17 @@ import CreditCardIcon from '@mui/icons-material/CreditCard';
 import DirectionsCarIcon from '@mui/icons-material/DirectionsCar';
 import PaletteIcon from '@mui/icons-material/Palette';
 import DeleteSweepIcon from '@mui/icons-material/DeleteSweep';
+import VisibilityIcon from '@mui/icons-material/Visibility';
+import VisibilityOffIcon from '@mui/icons-material/VisibilityOff';
+import MoneyOffIcon from '@mui/icons-material/MoneyOff';
 import type { Expense, Category, PaymentStatus, UserCategory } from '@/types';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { useCategories } from '@/hooks/useCategories';
 import { useAuth } from '@/contexts/AuthContext';
+import { CommentDialog } from './CommentDialog';
+import { DebtDialog } from './DebtDialog';
+import * as MuiIcons from '@mui/icons-material';
 
 interface ExpenseTableProps {
   expenses: Expense[];
@@ -117,6 +123,9 @@ export const ExpenseTable = ({ expenses, categories, onEdit, onUpdate, onDelete,
   const [tempColorTo, setTempColorTo] = useState<string>('');
   const [deleteCategoryDialog, setDeleteCategoryDialog] = useState<string | null>(null);
   const [isDeletingCategory, setIsDeletingCategory] = useState(false);
+  const [commentDialogOpen, setCommentDialogOpen] = useState(false);
+  const [debtDialogOpen, setDebtDialogOpen] = useState(false);
+  const [selectedExpense, setSelectedExpense] = useState<Expense | null>(null);
 
   // Inicializar expandedCategories con todas las categorías
   useEffect(() => {
@@ -224,6 +233,50 @@ export const ExpenseTable = ({ expenses, categories, onEdit, onUpdate, onDelete,
     }
   };
 
+  const handleOpenCommentDialog = (expense: Expense) => {
+    setSelectedExpense(expense);
+    setCommentDialogOpen(true);
+  };
+
+  const handleSaveComment = async (comment: string) => {
+    if (!selectedExpense?.id) return;
+
+    try {
+      const { updateCategoryColors, ...expenseData } = selectedExpense as any;
+
+      const updatedExpense = {
+        ...expenseData,
+        comment: comment || null, // null para indicar que se debe eliminar
+      };
+
+      await onUpdate(updatedExpense);
+    } catch (error) {
+      console.error('Error saving comment:', error);
+    }
+  };
+
+  const handleOpenDebtDialog = (expense: Expense) => {
+    setSelectedExpense(expense);
+    setDebtDialogOpen(true);
+  };
+
+  const handleSaveDebt = async (debt: number) => {
+    if (!selectedExpense?.id) return;
+
+    try {
+      const { updateCategoryColors, ...expenseData } = selectedExpense as any;
+
+      const updatedExpense = {
+        ...expenseData,
+        debt: debt > 0 ? debt : null, // null para indicar que se debe eliminar
+      };
+
+      await onUpdate(updatedExpense);
+    } catch (error) {
+      console.error('Error saving debt:', error);
+    }
+  };
+
   // Obtener solo las categorías que tienen gastos
   const categoryTotals = categories.map((userCategory, index) => {
     const categoryExpenses = expenses.filter(exp => exp.category === userCategory.id);
@@ -248,6 +301,9 @@ export const ExpenseTable = ({ expenses, categories, onEdit, onUpdate, onDelete,
   const grandTotalARS = categoryTotals.reduce((sum, cat) => sum + cat.totalARS, 0);
   const grandTotalUSD = categoryTotals.reduce((sum, cat) => sum + cat.totalUSD, 0);
   const grandTotalInARS = grandTotalARS + (grandTotalUSD * usdRate);
+
+  // Calcular total de deudas
+  const totalDebt = expenses.reduce((sum, exp) => sum + (exp.debt || 0), 0);
 
   // Componente para fila arrastrable
   const DraggableRow = ({ expense, children }: { expense: Expense; children: React.ReactNode }) => {
@@ -487,7 +543,13 @@ export const ExpenseTable = ({ expenses, categories, onEdit, onUpdate, onDelete,
                                 variant="standard"
                               />
                             ) : (
-                              expense.item
+                              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                {expense.icon && (() => {
+                                  const IconComponent = (MuiIcons as any)[expense.icon];
+                                  return IconComponent ? <IconComponent sx={{ fontSize: 20, color: '#2196f3' }} /> : null;
+                                })()}
+                                <span>{expense.item}</span>
+                              </Box>
                             )}
                           </TableCell>
                           <TableCell
@@ -603,6 +665,33 @@ export const ExpenseTable = ({ expenses, categories, onEdit, onUpdate, onDelete,
                             />
                           </TableCell>
                           <TableCell align="center">
+                            <Tooltip title={expense.comment || ''} arrow>
+                              <span>
+                                <IconButton
+                                  size="small"
+                                  onClick={() => handleOpenCommentDialog(expense)}
+                                  color={expense.comment ? 'info' : 'default'}
+                                  sx={{ mr: 0.5, opacity: expense.comment ? 1 : 0.5 }}
+                                >
+                                  {expense.comment ? <VisibilityIcon fontSize="small" /> : <VisibilityOffIcon fontSize="small" />}
+                                </IconButton>
+                              </span>
+                            </Tooltip>
+                            <Tooltip title={expense.debt ? `Deuda: $${expense.debt.toLocaleString('es-AR')}` : ''} arrow>
+                              <span>
+                                <IconButton
+                                  size="small"
+                                  onClick={() => handleOpenDebtDialog(expense)}
+                                  sx={{
+                                    mr: 0.5,
+                                    color: expense.debt ? '#ef4444' : '#9ca3af',
+                                    opacity: expense.debt ? 1 : 0.5
+                                  }}
+                                >
+                                  <MoneyOffIcon fontSize="small" />
+                                </IconButton>
+                              </span>
+                            </Tooltip>
                             <IconButton
                               size="small"
                               onClick={() => onEdit(expense)}
@@ -718,6 +807,20 @@ export const ExpenseTable = ({ expenses, categories, onEdit, onUpdate, onDelete,
                   </Typography>
                   <Typography variant="subtitle1" sx={{ fontWeight: 700, fontSize: '1rem', lineHeight: 1.2 }}>
                     $ {grandTotalInARS.toLocaleString('es-AR', { maximumFractionDigits: 0 })}
+                  </Typography>
+                </Box>
+              )}
+              {totalDebt > 0 && (
+                <Box sx={{
+                  textAlign: 'right',
+                  pl: 2,
+                  borderLeft: '1px solid rgba(255, 255, 255, 0.3)'
+                }}>
+                  <Typography variant="caption" sx={{ opacity: 0.85, fontSize: '0.65rem', display: 'block', color: '#fca5a5' }}>
+                    Deuda Total
+                  </Typography>
+                  <Typography variant="h6" fontWeight="bold" sx={{ color: '#ef4444', fontSize: '1.25rem', lineHeight: 1.2 }}>
+                    $ {totalDebt.toLocaleString('es-AR', { maximumFractionDigits: 0 })}
                   </Typography>
                 </Box>
               )}
@@ -863,6 +966,28 @@ export const ExpenseTable = ({ expenses, categories, onEdit, onUpdate, onDelete,
           )}
         </DialogActions>
       </Dialog>
+
+      {/* Dialog para comentarios */}
+      <CommentDialog
+        open={commentDialogOpen}
+        initialComment={selectedExpense?.comment}
+        onClose={() => {
+          setCommentDialogOpen(false);
+          setSelectedExpense(null);
+        }}
+        onSave={handleSaveComment}
+      />
+
+      {/* Dialog para deudas */}
+      <DebtDialog
+        open={debtDialogOpen}
+        initialDebt={selectedExpense?.debt}
+        onClose={() => {
+          setDebtDialogOpen(false);
+          setSelectedExpense(null);
+        }}
+        onSave={handleSaveDebt}
+      />
     </Box>
     </DndContext>
   );

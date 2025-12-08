@@ -10,6 +10,7 @@ import {
   onSnapshot,
   orderBy,
   writeBatch,
+  deleteField,
 } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import type { Expense } from '@/types';
@@ -99,10 +100,27 @@ export const useExpenses = (month: number, year: number) => {
   const updateExpense = async (id: string, expense: Partial<Expense>) => {
     try {
       const expenseRef = doc(db, 'expenses', id);
-      await updateDoc(expenseRef, {
-        ...expense,
+
+      // Crear objeto de actualización
+      const updateData: any = {
         updatedAt: new Date(),
+      };
+
+      // Copiar campos, usando deleteField() para valores null
+      Object.keys(expense).forEach((key) => {
+        const value = (expense as any)[key];
+
+        // Si el valor es null, usar deleteField() para eliminar el campo
+        if (value === null) {
+          updateData[key] = deleteField();
+        }
+        // Si no es undefined, agregarlo
+        else if (value !== undefined) {
+          updateData[key] = value;
+        }
       });
+
+      await updateDoc(expenseRef, updateData);
     } catch (error) {
       console.error('Error updating expense:', error);
       throw error;
