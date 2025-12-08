@@ -10,6 +10,8 @@ import {
   Stack,
   IconButton,
   InputAdornment,
+  ListItemIcon,
+  ListItemText,
 } from '@mui/material';
 import { useState, useEffect } from 'react';
 import type { Expense, Currency, PaymentStatus, UserCategory } from '@/types';
@@ -21,6 +23,7 @@ import { format } from 'date-fns';
 import { IconSelector } from './IconSelector';
 import * as MuiIcons from '@mui/icons-material';
 import SearchIcon from '@mui/icons-material/Search';
+import AddIcon from '@mui/icons-material/Add';
 
 interface ExpenseDialogProps {
   open: boolean;
@@ -30,6 +33,7 @@ interface ExpenseDialogProps {
   selectedMonth: number;
   selectedYear: number;
   categories: UserCategory[];
+  onOpenCategoryManager?: () => void;
 }
 
 const statusOptions: { value: PaymentStatus; label: string }[] = PAYMENT_STATUSES.map(status => ({
@@ -46,6 +50,7 @@ export const ExpenseDialog = ({
   selectedMonth,
   selectedYear,
   categories,
+  onOpenCategoryManager,
 }: ExpenseDialogProps) => {
   const defaultCategory = categories.length > 0 ? categories[0].id! : '';
 
@@ -120,13 +125,29 @@ export const ExpenseDialog = ({
             fullWidth
             label="Categoría"
             value={formData.category}
-            onChange={(e) => setFormData({ ...formData, category: e.target.value })}
+            onChange={(e) => {
+              if (e.target.value === '__add_new__') {
+                if (onOpenCategoryManager) {
+                  onOpenCategoryManager();
+                }
+              } else {
+                setFormData({ ...formData, category: e.target.value });
+              }
+            }}
           >
             {categories.map((cat) => (
               <MenuItem key={cat.id} value={cat.id}>
                 {cat.name}
               </MenuItem>
             ))}
+            {onOpenCategoryManager && (
+              <MenuItem value="__add_new__" sx={{ color: 'primary.main', fontWeight: 600 }}>
+                <ListItemIcon>
+                  <AddIcon color="primary" />
+                </ListItemIcon>
+                <ListItemText primary="Agregar nueva categoría" />
+              </MenuItem>
+            )}
           </TextField>
 
           <Box sx={{ display: 'flex', gap: 2, alignItems: 'center' }}>

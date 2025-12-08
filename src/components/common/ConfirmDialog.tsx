@@ -6,6 +6,7 @@ import {
   Button,
   Typography,
   Box,
+  CircularProgress,
 } from '@mui/material';
 import WarningAmberIcon from '@mui/icons-material/WarningAmber';
 import ErrorOutlineIcon from '@mui/icons-material/ErrorOutline';
@@ -19,6 +20,7 @@ interface ConfirmDialogProps {
   confirmText?: string;
   cancelText?: string;
   severity?: 'error' | 'warning' | 'info' | 'question';
+  loading?: boolean;
   onConfirm: () => void;
   onCancel: () => void;
 }
@@ -43,13 +45,14 @@ export const ConfirmDialog = ({
   confirmText = 'Confirmar',
   cancelText = 'Cancelar',
   severity = 'question',
+  loading = false,
   onConfirm,
   onCancel,
 }: ConfirmDialogProps) => {
   return (
     <Dialog
       open={open}
-      onClose={onCancel}
+      onClose={loading ? undefined : onCancel}
       maxWidth="xs"
       fullWidth
       PaperProps={{
@@ -68,9 +71,18 @@ export const ConfirmDialog = ({
         </Box>
       </DialogTitle>
       <DialogContent>
-        <Typography variant="body1" color="text.secondary">
-          {message}
-        </Typography>
+        {loading ? (
+          <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', py: 3 }}>
+            <CircularProgress size={48} />
+            <Typography variant="body2" sx={{ mt: 2, color: 'text.secondary' }}>
+              Eliminando...
+            </Typography>
+          </Box>
+        ) : (
+          <Typography variant="body1" color="text.secondary">
+            {message}
+          </Typography>
+        )}
       </DialogContent>
       <DialogActions sx={{ p: 2.5, gap: 1 }}>
         <Button
@@ -78,6 +90,7 @@ export const ConfirmDialog = ({
           variant="outlined"
           color="inherit"
           sx={{ minWidth: 100 }}
+          disabled={loading}
         >
           {cancelText}
         </Button>
@@ -87,6 +100,7 @@ export const ConfirmDialog = ({
           color={severity === 'error' || severity === 'warning' ? 'error' : 'primary'}
           sx={{ minWidth: 100 }}
           autoFocus
+          disabled={loading}
         >
           {confirmText}
         </Button>

@@ -45,6 +45,7 @@ export const Dashboard = () => {
   const [expenseToDelete, setExpenseToDelete] = useState<string | null>(null);
   const [usdRates, setUsdRates] = useState({ compra: 0, venta: 0 });
   const [loadingUsd, setLoadingUsd] = useState(true);
+  const [deletingExpense, setDeletingExpense] = useState(false);
 
   // Custom Hooks
   const {
@@ -130,15 +131,18 @@ export const Dashboard = () => {
 
   const confirmDelete = async () => {
     if (expenseToDelete) {
+      setDeletingExpense(true);
       try {
         await deleteExpense(expenseToDelete);
         enqueueSnackbar('Gasto eliminado exitosamente', { variant: 'success' });
       } catch (error) {
         enqueueSnackbar('Error al eliminar el gasto', { variant: 'error' });
+      } finally {
+        setDeletingExpense(false);
+        setConfirmDialogOpen(false);
+        setExpenseToDelete(null);
       }
     }
-    setConfirmDialogOpen(false);
-    setExpenseToDelete(null);
   };
 
   const handleDeleteMultiple = async (ids: string[]) => {
@@ -278,6 +282,9 @@ export const Dashboard = () => {
                 onUpdate={handleUpdate}
                 onDelete={handleDelete}
                 onDeleteMultiple={handleDeleteMultiple}
+                onAdd={addExpense}
+                selectedMonth={selectedMonth}
+                selectedYear={selectedYear}
               />
             )}
             {activeTab === 1 && (
@@ -298,6 +305,9 @@ export const Dashboard = () => {
         onSave={handleSaveExpense}
         selectedMonth={selectedMonth}
         selectedYear={selectedYear}
+        onOpenCategoryManager={() => {
+          setCategoryManagerOpen(true);
+        }}
       />
 
       <TemplateDialog
@@ -319,6 +329,7 @@ export const Dashboard = () => {
           setConfirmDialogOpen(false);
           setExpenseToDelete(null);
         }}
+        loading={deletingExpense}
       />
 
       <CategoryManager

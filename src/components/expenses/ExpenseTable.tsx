@@ -21,6 +21,8 @@ import {
   DialogActions,
   Button,
   CircularProgress,
+  Menu,
+  MenuItem,
 } from '@mui/material';
 import { DndContext, useSensor, useSensors, PointerSensor, useDroppable, DragOverlay, closestCenter } from '@dnd-kit/core';
 import type { DragEndEvent, DragStartEvent } from '@dnd-kit/core';
@@ -56,7 +58,12 @@ interface ExpenseTableProps {
   onUpdate: (expense: Expense, previousExpense?: Expense, silent?: boolean) => void;
   onDelete: (id: string) => void;
   onDeleteMultiple?: (ids: string[]) => Promise<void>;
+  onAdd?: (expense: Omit<Expense, 'id' | 'createdAt' | 'updatedAt'>) => void;
+  selectedMonth: number;
+  selectedYear: number;
 }
+
+const STATUS_OPTIONS: PaymentStatus[] = ['pendiente', 'pagado', 'bonificado', 'pago anual'];
 
 const getStatusColor = (status: PaymentStatus) => {
   switch (status) {
@@ -73,6 +80,11 @@ const getStatusColor = (status: PaymentStatus) => {
     case 'pendiente':
       return {
         bgcolor: '#f59e0b',
+        color: 'white',
+      };
+    case 'pago anual':
+      return {
+        bgcolor: '#7c3aed',
         color: 'white',
       };
     default:
@@ -114,7 +126,7 @@ const getCategoryColor = (category: UserCategory | undefined, categoryIndex: num
   return DEFAULT_CATEGORY_COLORS[categoryIndex % DEFAULT_CATEGORY_COLORS.length];
 };
 
-export const ExpenseTable = ({ expenses, categories, onEdit, onUpdate, onDelete, onDeleteMultiple }: ExpenseTableProps) => {
+export const ExpenseTable = ({ expenses, categories, onEdit, onUpdate, onDelete, onDeleteMultiple, onAdd, selectedMonth, selectedYear }: ExpenseTableProps) => {
   const { user } = useAuth();
   const { updateCategoryColors } = useCategories(user?.uid);
   const { enqueueSnackbar } = useSnackbar();
@@ -131,6 +143,8 @@ export const ExpenseTable = ({ expenses, categories, onEdit, onUpdate, onDelete,
   const [debtDialogOpen, setDebtDialogOpen] = useState(false);
   const [selectedExpense, setSelectedExpense] = useState<Expense | null>(null);
   const [activeId, setActiveId] = useState<string | null>(null);
+  const [statusMenuExpense, setStatusMenuExpense] = useState<Expense | null>(null);
+  const [statusMenuPosition, setStatusMenuPosition] = useState<{ top: number; left: number } | null>(null);
 
   // Inicializar expandedCategories con todas las categorías
   useEffect(() => {
@@ -168,11 +182,14 @@ export const ExpenseTable = ({ expenses, categories, onEdit, onUpdate, onDelete,
 
     let value = expense[field as keyof Expense];
 
-    // Para fechas, convertir a formato YYYY-MM-DD para el input type="date"
+    // Para fechas, convertir de AAAA-MM-DD a DD/MM/AAAA
     if ((field === 'vto' || field === 'fechaPago') && value && value !== 'Bonificado' && value !== '') {
       try {
-        const date = new Date(value as string);
-        value = date.toISOString().split('T')[0];
+        const dateStr = value as string;
+        if (dateStr.includes('-')) {
+          const [year, month, day] = dateStr.split('-');
+          value = `${day}/${month}/${year}`;
+        }
       } catch (e) {
         value = '';
       }
@@ -189,7 +206,21 @@ export const ExpenseTable = ({ expenses, categories, onEdit, onUpdate, onDelete,
       event.stopPropagation();
     }
 
-    const newValue = editingCell.field === 'importe' ? Number(editValue) : editValue;
+    let newValue: string | number = editValue;
+
+    // Convertir fecha de DD/MM/AAAA a AAAA-MM-DD si es un campo de fecha
+    if (editingCell.field === 'vto' || editingCell.field === 'fechaPago') {
+      if (editValue.includes('/')) {
+        const parts = editValue.split('/');
+        if (parts.length === 3) {
+          const [day, month, year] = parts;
+          newValue = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+        }
+      }
+    } else if (editingCell.field === 'importe') {
+      newValue = Number(editValue);
+    }
+
     const oldValue = expense[editingCell.field as keyof Expense];
 
     // Solo actualizar si el valor cambió
@@ -336,15 +367,67 @@ export const ExpenseTable = ({ expenses, categories, onEdit, onUpdate, onDelete,
     }
   };
 
+  const handleStatusClick = (expense: Expense, event: React.MouseEvent<HTMLDivElement>) => {
+    event.stopPropagation();
+    event.preventDefault();
+    const rect = event.currentTarget.getBoundingClientRect();
+    setStatusMenuPosition({
+      top: rect.bottom + window.scrollY,
+      left: rect.left + window.scrollX,
+    });
+    setStatusMenuExpense(expense);
+  };
+
+  const handleStatusMenuClose = () => {
+    setStatusMenuExpense(null);
+    setStatusMenuPosition(null);
+  };
+
+  const handleStatusChange = (newStatus: PaymentStatus) => {
+    if (statusMenuExpense) {
+      const updatedExpense = {
+        ...statusMenuExpense,
+        status: newStatus,
+      };
+      onUpdate(updatedExpense);
+    }
+    handleStatusMenuClose();
+  };
+
+  const handleQuickAdd = (categoryId: string) => {
+    if (!onAdd || !user) return;
+
+    const newExpense: Omit<Expense, 'id' | 'createdAt' | 'updatedAt'> = {
+      userId: user.uid,
+      item: '-',
+      vto: '-',
+      fechaPago: '-',
+      importe: 0,
+      currency: 'ARS',
+      pagadoPor: '-',
+      status: 'pendiente',
+      category: categoryId,
+      month: selectedMonth,
+      year: selectedYear,
+      order: expenses.filter(exp => exp.category === categoryId).length,
+    };
+
+    onAdd(newExpense);
+  };
+
   // Obtener solo las categorías que tienen gastos
   const categoryTotals = categories.map((userCategory, index) => {
     const categoryExpenses = expenses
       .filter(exp => exp.category === userCategory.id)
       .sort((a, b) => (a.order || 0) - (b.order || 0)); // Sort by order
-    const totalARS = categoryExpenses
+
+    // Filtrar solo gastos que NO están pendientes para los totales
+    const paidExpenses = categoryExpenses.filter(exp => exp.status !== 'pendiente');
+
+    const totalARS = paidExpenses
       .filter(exp => exp.currency === 'ARS')
       .reduce((sum, exp) => sum + exp.importe, 0);
-    const totalUSD = categoryExpenses
+    const totalUSD = paidExpenses
       .filter(exp => exp.currency === 'USD')
       .reduce((sum, exp) => sum + exp.importe, 0);
 
@@ -392,8 +475,11 @@ export const ExpenseTable = ({ expenses, categories, onEdit, onUpdate, onDelete,
         ref={setNodeRef}
         style={style}
         hover
+        {...listeners}
+        {...attributes}
         sx={{
           bgcolor: 'inherit',
+          cursor: isDragging ? 'move' : 'pointer',
           '&:hover': {
             bgcolor: '#e0f2fe',
             transition: 'background-color 0.2s ease',
@@ -407,9 +493,7 @@ export const ExpenseTable = ({ expenses, categories, onEdit, onUpdate, onDelete,
         }}
       >
         <TableCell sx={{ width: 40, p: 0 }}>
-          <IconButton size="small" {...listeners} {...attributes}>
-            <DragIndicatorIcon fontSize="small" />
-          </IconButton>
+          <DragIndicatorIcon fontSize="small" sx={{ color: 'text.secondary' }} />
         </TableCell>
         {children}
       </TableRow>
@@ -524,6 +608,25 @@ export const ExpenseTable = ({ expenses, categories, onEdit, onUpdate, onDelete,
               </Box>
 
               {/* Category actions */}
+              <Tooltip title="Agregar gasto rápido" arrow>
+                <IconButton
+                  size="small"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleQuickAdd(categoryId);
+                  }}
+                  sx={{
+                    color: 'white',
+                    p: 0.5,
+                    ml: 0.5,
+                    '&:hover': {
+                      bgcolor: 'rgba(255, 255, 255, 0.2)',
+                    }
+                  }}
+                >
+                  <MuiIcons.Add fontSize="small" />
+                </IconButton>
+              </Tooltip>
               <IconButton
                 size="small"
                 onClick={(e) => {
@@ -533,7 +636,7 @@ export const ExpenseTable = ({ expenses, categories, onEdit, onUpdate, onDelete,
                   setTempColorFrom(category?.colorFrom || colors.from);
                   setTempColorTo(category?.colorTo || colors.to);
                 }}
-                sx={{ color: 'white', p: 0.5, ml: 0.5 }}
+                sx={{ color: 'white', p: 0.5 }}
               >
                 <PaletteIcon fontSize="small" />
               </IconButton>
@@ -646,18 +749,31 @@ export const ExpenseTable = ({ expenses, categories, onEdit, onUpdate, onDelete,
                             {editingCell?.id === expense.id && editingCell?.field === 'vto' ? (
                               <TextField
                                 value={editValue}
-                                onChange={(e) => setEditValue(e.target.value)}
+                                onChange={(e) => {
+                                  let value = e.target.value.replace(/[^\d]/g, ''); // Solo números
+
+                                  // Auto-formatear con barras
+                                  if (value.length >= 2) {
+                                    value = value.slice(0, 2) + '/' + value.slice(2);
+                                  }
+                                  if (value.length >= 5) {
+                                    value = value.slice(0, 5) + '/' + value.slice(5, 9);
+                                  }
+
+                                  if (value.length <= 10) {
+                                    setEditValue(value);
+                                  }
+                                }}
                                 onBlur={(e) => handleCellBlur(expense, e)}
                                 onKeyDown={(e) => handleKeyDown(e, expense)}
                                 autoFocus
                                 size="small"
-                                type="date"
                                 variant="standard"
                                 sx={{ maxWidth: 140 }}
-                                InputLabelProps={{ shrink: true }}
+                                placeholder="DD/MM/AAAA"
                               />
-                            ) : expense.vto && expense.vto !== 'Bonificado' && expense.vto !== '' ? (
-                              format(new Date(expense.vto), 'dd/MM/yyyy', { locale: es })
+                            ) : expense.vto && expense.vto !== 'Bonificado' && expense.vto !== '' && expense.vto !== '-' && /^\d{4}-\d{2}-\d{2}$/.test(expense.vto) ? (
+                              format(new Date(expense.vto + 'T00:00:00'), 'dd/MM/yyyy', { locale: es })
                             ) : (
                               expense.vto || '-'
                             )}
@@ -672,18 +788,31 @@ export const ExpenseTable = ({ expenses, categories, onEdit, onUpdate, onDelete,
                             {editingCell?.id === expense.id && editingCell?.field === 'fechaPago' ? (
                               <TextField
                                 value={editValue}
-                                onChange={(e) => setEditValue(e.target.value)}
+                                onChange={(e) => {
+                                  let value = e.target.value.replace(/[^\d]/g, ''); // Solo números
+
+                                  // Auto-formatear con barras
+                                  if (value.length >= 2) {
+                                    value = value.slice(0, 2) + '/' + value.slice(2);
+                                  }
+                                  if (value.length >= 5) {
+                                    value = value.slice(0, 5) + '/' + value.slice(5, 9);
+                                  }
+
+                                  if (value.length <= 10) {
+                                    setEditValue(value);
+                                  }
+                                }}
                                 onBlur={(e) => handleCellBlur(expense, e)}
                                 onKeyDown={(e) => handleKeyDown(e, expense)}
                                 autoFocus
                                 size="small"
-                                type="date"
                                 variant="standard"
                                 sx={{ maxWidth: 140 }}
-                                InputLabelProps={{ shrink: true }}
+                                placeholder="DD/MM/AAAA"
                               />
-                            ) : expense.fechaPago && expense.fechaPago !== 'Bonificado' && expense.fechaPago !== '' && !expense.fechaPago.includes('PAGO') ? (
-                              format(new Date(expense.fechaPago), 'dd/MM/yyyy', { locale: es })
+                            ) : expense.fechaPago && expense.fechaPago !== 'Bonificado' && expense.fechaPago !== '' && expense.fechaPago !== '-' && !expense.fechaPago.includes('PAGO') && /^\d{4}-\d{2}-\d{2}$/.test(expense.fechaPago) ? (
+                              format(new Date(expense.fechaPago + 'T00:00:00'), 'dd/MM/yyyy', { locale: es })
                             ) : (
                               expense.fechaPago || '-'
                             )}
@@ -739,14 +868,29 @@ export const ExpenseTable = ({ expenses, categories, onEdit, onUpdate, onDelete,
                             )}
                           </TableCell>
                           <TableCell>
-                            <Chip
-                              label={expense.status.toUpperCase()}
-                              size="small"
+                            <Box
+                              onClick={(e) => handleStatusClick(expense, e)}
                               sx={{
-                                fontWeight: 600,
-                                ...getStatusColor(expense.status)
+                                display: 'inline-block',
+                                cursor: 'pointer',
                               }}
-                            />
+                            >
+                              <Chip
+                                label={expense.status.toUpperCase()}
+                                size="small"
+                                sx={{
+                                  fontWeight: 600,
+                                  cursor: 'pointer',
+                                  transition: 'all 0.2s',
+                                  pointerEvents: 'none',
+                                  '&:hover': {
+                                    transform: 'scale(1.05)',
+                                    boxShadow: '0 2px 8px rgba(0,0,0,0.2)',
+                                  },
+                                  ...getStatusColor(expense.status)
+                                }}
+                              />
+                            </Box>
                           </TableCell>
                           <TableCell align="center">
                             <Tooltip title={expense.comment || ''} arrow>
@@ -1092,6 +1236,51 @@ export const ExpenseTable = ({ expenses, categories, onEdit, onUpdate, onDelete,
           </Box>
         ) : null}
       </DragOverlay>
+
+      {/* Status Menu */}
+      <Menu
+        open={Boolean(statusMenuPosition)}
+        onClose={handleStatusMenuClose}
+        anchorReference="anchorPosition"
+        anchorPosition={
+          statusMenuPosition
+            ? { top: statusMenuPosition.top, left: statusMenuPosition.left }
+            : undefined
+        }
+        slotProps={{
+          paper: {
+            sx: {
+              mt: 0.5,
+            },
+          },
+        }}
+      >
+        {STATUS_OPTIONS.map((status) => (
+          <MenuItem
+            key={status}
+            onClick={() => handleStatusChange(status)}
+            selected={statusMenuExpense?.status === status}
+            sx={{
+              minWidth: 150,
+              display: 'flex',
+              alignItems: 'center',
+              gap: 1,
+            }}
+          >
+            <Box
+              sx={{
+                width: 12,
+                height: 12,
+                borderRadius: '50%',
+                ...getStatusColor(status),
+              }}
+            />
+            <Typography variant="body2">
+              {status === 'pago anual' ? 'Pago Anual' : status.charAt(0).toUpperCase() + status.slice(1)}
+            </Typography>
+          </MenuItem>
+        ))}
+      </Menu>
     </Box>
     </DndContext>
   );

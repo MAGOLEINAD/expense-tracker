@@ -48,6 +48,7 @@ export const Login = () => {
         top: 0,
         left: 0,
         overflow: isMobile ? 'auto' : 'hidden',
+        overflowX: 'hidden',
         '&::before': {
           content: '""',
           position: 'absolute',
@@ -76,7 +77,7 @@ export const Login = () => {
         },
       }}
     >
-      <Container maxWidth="lg" sx={{ position: 'relative', zIndex: 1, minHeight: '100%', display: 'flex', alignItems: 'center', py: isMobile ? 4 : 0 }}>
+      <Container maxWidth="lg" sx={{ position: 'relative', zIndex: 1, minHeight: '100%', display: 'flex', alignItems: 'center', py: isMobile ? 4 : 0, px: isMobile ? 2 : 3 }}>
         <Box
           sx={{
             width: '100%',
@@ -91,7 +92,7 @@ export const Login = () => {
               <Box
                 sx={{
                   flex: 1,
-                  minWidth: '300px',
+                  minWidth: isMobile ? '100%' : '300px',
                   maxWidth: '500px',
                   display: 'flex',
                   flexDirection: 'column',
@@ -138,7 +139,7 @@ export const Login = () => {
               </Box>
 
               {/* Right side - Login Card */}
-              <Box sx={{ flex: 1, minWidth: '300px', maxWidth: '450px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <Box sx={{ flex: 1, minWidth: isMobile ? '100%' : '300px', maxWidth: '450px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                 <Paper
                   elevation={24}
                   sx={{

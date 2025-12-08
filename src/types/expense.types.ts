@@ -1,6 +1,6 @@
 export type Currency = 'ARS' | 'USD';
 
-export type PaymentStatus = 'pagado' | 'bonificado' | 'pendiente';
+export type PaymentStatus = 'pagado' | 'bonificado' | 'pendiente' | 'pago anual';
 
 // Category is now a string since it's dynamic per user
 export type Category = string;
