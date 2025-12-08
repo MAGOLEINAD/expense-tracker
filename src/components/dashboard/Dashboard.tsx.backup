@@ -1,0 +1,452 @@
+import { useState } from 'react';
+import {
+  AppBar,
+  Toolbar,
+  Typography,
+  Button,
+  Container,
+  Box,
+  MenuItem,
+  Select,
+  FormControl,
+  InputLabel,
+  CircularProgress,
+  IconButton,
+  Avatar,
+  Menu,
+  useMediaQuery,
+  useTheme,
+  Drawer,
+  List,
+  ListItem,
+  ListItemIcon,
+  ListItemText,
+  Divider,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  Alert,
+  Stack,
+} from '@mui/material';
+import { useSnackbar } from 'notistack';
+import AddIcon from '@mui/icons-material/Add';
+import LogoutIcon from '@mui/icons-material/Logout';
+import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
+import ChevronRightIcon from '@mui/icons-material/ChevronRight';
+import ContentCopyIcon from '@mui/icons-material/ContentCopy';
+import TodayIcon from '@mui/icons-material/Today';
+import BarChartIcon from '@mui/icons-material/BarChart';
+import ListAltIcon from '@mui/icons-material/ListAlt';
+import MenuIcon from '@mui/icons-material/Menu';
+import { useAuth } from '@/contexts/AuthContext';
+import { useExpenses } from '@/hooks/useExpenses';
+import { ExpenseDialog } from '@/components/expenses/ExpenseDialog';
+import { ExpenseTable } from '@/components/expenses/ExpenseTable';
+import { Charts } from '@/components/charts/Charts';
+import { ConfirmDialog } from '@/components/common/ConfirmDialog';
+import type { Expense } from '@/types';
+import { MONTHS } from '@/utils';
+
+export const Dashboard = () => {
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('md'));
+  const { user, logout } = useAuth();
+  const { enqueueSnackbar } = useSnackbar();
+
+  const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth() + 1);
+  const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [editingExpense, setEditingExpense] = useState<Expense | null>(null);
+  const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
+  const [activeTab, setActiveTab] = useState(0);
+  const [templateDialogOpen, setTemplateDialogOpen] = useState(false);
+  const [templateSourceMonth, setTemplateSourceMonth] = useState(12);
+  const [templateSourceYear, setTemplateSourceYear] = useState(new Date().getFullYear());
+  const [confirmDialogOpen, setConfirmDialogOpen] = useState(false);
+  const [expenseToDelete, setExpenseToDelete] = useState<string | null>(null);
+  const [mobileDrawerOpen, setMobileDrawerOpen] = useState(false);
+
+  const { expenses, allExpenses, loading, addExpense, updateExpense, deleteExpense, applyTemplate } = useExpenses(
+    selectedMonth,
+    selectedYear
+  );
+
+  const handleSaveExpense = async (expense: Partial<Expense>) => {
+    try {
+      if (editingExpense?.id) {
+        await updateExpense(editingExpense.id, expense);
+        enqueueSnackbar('Gasto actualizado exitosamente', { variant: 'success' });
+      } else {
+        await addExpense(expense);
+        enqueueSnackbar('Gasto agregado exitosamente', { variant: 'success' });
+      }
+      setEditingExpense(null);
+    } catch (error) {
+      console.error('Error saving expense:', error);
+      enqueueSnackbar('Error al guardar el gasto', { variant: 'error' });
+    }
+  };
+
+  const handleEdit = (expense: Expense) => {
+    setEditingExpense(expense);
+    setDialogOpen(true);
+  };
+
+  const handleDelete = async (id: string) => {
+    setExpenseToDelete(id);
+    setConfirmDialogOpen(true);
+  };
+
+  const confirmDelete = async () => {
+    if (expenseToDelete) {
+      try {
+        await deleteExpense(expenseToDelete);
+        enqueueSnackbar('Gasto eliminado exitosamente', { variant: 'success' });
+      } catch (error) {
+        enqueueSnackbar('Error al eliminar el gasto', { variant: 'error' });
+      }
+    }
+    setConfirmDialogOpen(false);
+    setExpenseToDelete(null);
+  };
+
+  const handleOpenDialog = () => {
+    setEditingExpense(null);
+    setDialogOpen(true);
+  };
+
+  const handlePreviousMonth = () => {
+    if (selectedMonth === 1) {
+      setSelectedMonth(12);
+      setSelectedYear(selectedYear - 1);
+    } else {
+      setSelectedMonth(selectedMonth - 1);
+    }
+  };
+
+  const handleNextMonth = () => {
+    if (selectedMonth === 12) {
+      setSelectedMonth(1);
+      setSelectedYear(selectedYear + 1);
+    } else {
+      setSelectedMonth(selectedMonth + 1);
+    }
+  };
+
+  const handleGoToday = () => {
+    const now = new Date();
+    setSelectedMonth(now.getMonth() + 1);
+    setSelectedYear(now.getFullYear());
+    enqueueSnackbar('Volviendo al mes actual', { variant: 'info' });
+  };
+
+  const handleApplyTemplate = async () => {
+    try {
+      await applyTemplate(templateSourceMonth, templateSourceYear, selectedMonth, selectedYear);
+      setTemplateDialogOpen(false);
+      enqueueSnackbar('Template aplicado exitosamente', { variant: 'success' });
+    } catch (error) {
+      console.error('Error applying template:', error);
+      enqueueSnackbar('Error al aplicar el template', { variant: 'error' });
+    }
+  };
+
+  return (
+    <>
+      {/* AppBar compacto */}
+      <AppBar position="sticky" elevation={1} sx={{ bgcolor: 'primary.main' }}>
+        <Toolbar variant="dense" sx={{ minHeight: 48 }}>
+          {isMobile && (
+            <IconButton
+              edge="start"
+              color="inherit"
+              onClick={() => setMobileDrawerOpen(true)}
+              sx={{ mr: 1 }}
+            >
+              <MenuIcon />
+            </IconButton>
+          )}
+          <Typography variant="subtitle1" sx={{ flexGrow: 1, fontWeight: 700 }}>
+            💰 Organizador de Gastos
+          </Typography>
+          {!isMobile && (
+            <Typography variant="body2" sx={{ mr: 2, opacity: 0.9 }}>
+              {user?.displayName}
+            </Typography>
+          )}
+          <IconButton onClick={(e) => setAnchorEl(e.currentTarget)} size="small">
+            <Avatar src={user?.photoURL || ''} sx={{ width: 28, height: 28 }}>
+              {user?.displayName?.[0]}
+            </Avatar>
+          </IconButton>
+          <Menu anchorEl={anchorEl} open={Boolean(anchorEl)} onClose={() => setAnchorEl(null)}>
+            {isMobile && (
+              <MenuItem disabled>
+                <Typography variant="caption">{user?.displayName}</Typography>
+              </MenuItem>
+            )}
+            {isMobile && <Divider />}
+            <MenuItem onClick={logout}>
+              <LogoutIcon sx={{ mr: 1, fontSize: 18 }} /> Cerrar Sesión
+            </MenuItem>
+          </Menu>
+        </Toolbar>
+      </AppBar>
+
+      {/* Mobile Drawer */}
+      <Drawer anchor="left" open={mobileDrawerOpen} onClose={() => setMobileDrawerOpen(false)}>
+        <Box sx={{ width: 250, pt: 1 }}>
+          <Box sx={{ px: 2, pb: 1 }}>
+            <Typography variant="subtitle1" sx={{ fontWeight: 700 }}>
+              Menú
+            </Typography>
+          </Box>
+          <Divider />
+          <List dense>
+            <ListItem button onClick={() => { setActiveTab(0); setMobileDrawerOpen(false); }}>
+              <ListItemIcon>
+                <ListAltIcon color={activeTab === 0 ? 'primary' : 'inherit'} />
+              </ListItemIcon>
+              <ListItemText primary="Gastos" />
+            </ListItem>
+            <ListItem button onClick={() => { setActiveTab(1); setMobileDrawerOpen(false); }}>
+              <ListItemIcon>
+                <BarChartIcon color={activeTab === 1 ? 'primary' : 'inherit'} />
+              </ListItemIcon>
+              <ListItemText primary="Análisis" />
+            </ListItem>
+          </List>
+        </Box>
+      </Drawer>
+
+      <Container maxWidth="xl" sx={{ py: isMobile ? 1 : 1.5, px: isMobile ? 1 : 2 }}>
+        {/* Controles compactos */}
+        <Stack
+          direction="row"
+          spacing={1}
+          alignItems="center"
+          sx={{
+            bgcolor: 'background.paper',
+            p: 1,
+            borderRadius: 2,
+            mb: 1.5,
+            boxShadow: 1,
+          }}
+        >
+          <IconButton onClick={handlePreviousMonth} size="small" color="primary">
+            <ChevronLeftIcon />
+          </IconButton>
+
+          <Box
+            sx={{
+              px: 2,
+              py: 0.5,
+              bgcolor: 'primary.main',
+              color: 'white',
+              borderRadius: 1.5,
+              minWidth: isMobile ? 140 : 200,
+              textAlign: 'center',
+            }}
+          >
+            <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>
+              {MONTHS[selectedMonth - 1]} {selectedYear}
+            </Typography>
+          </Box>
+
+          <IconButton onClick={handleNextMonth} size="small" color="primary">
+            <ChevronRightIcon />
+          </IconButton>
+
+          {!isMobile && (
+            <IconButton onClick={handleGoToday} size="small" color="primary" sx={{ ml: 1 }}>
+              <TodayIcon fontSize="small" />
+            </IconButton>
+          )}
+
+          <Box sx={{ flexGrow: 1 }} />
+
+          <FormControl size="small" sx={{ minWidth: isMobile ? 80 : 120 }}>
+            <Select
+              value={selectedMonth}
+              onChange={(e) => setSelectedMonth(Number(e.target.value))}
+              sx={{ fontSize: '0.875rem' }}
+            >
+              {MONTHS.map((month, index) => (
+                <MenuItem key={month} value={index + 1}>
+                  {isMobile ? month.slice(0, 3) : month}
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+
+          <FormControl size="small" sx={{ minWidth: 70 }}>
+            <Select
+              value={selectedYear}
+              onChange={(e) => setSelectedYear(Number(e.target.value))}
+              sx={{ fontSize: '0.875rem' }}
+            >
+              {[2023, 2024, 2025, 2026, 2027].map((year) => (
+                <MenuItem key={year} value={year}>{year}</MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+
+          {!isMobile && (
+            <Button
+              variant="outlined"
+              startIcon={<ContentCopyIcon />}
+              onClick={() => setTemplateDialogOpen(true)}
+              size="small"
+              sx={{ textTransform: 'none' }}
+            >
+              Template
+            </Button>
+          )}
+
+          <Button
+            variant="contained"
+            startIcon={<AddIcon />}
+            onClick={handleOpenDialog}
+            size="small"
+            sx={{ textTransform: 'none', fontWeight: 600 }}
+          >
+            {isMobile ? 'Nuevo' : 'Nuevo Gasto'}
+          </Button>
+
+          {!isMobile && (
+            <>
+              <Divider orientation="vertical" flexItem sx={{ mx: 1 }} />
+              <Button
+                variant={activeTab === 0 ? 'contained' : 'text'}
+                startIcon={<ListAltIcon />}
+                onClick={() => setActiveTab(0)}
+                size="small"
+                sx={{ textTransform: 'none' }}
+              >
+                Gastos
+              </Button>
+              <Button
+                variant={activeTab === 1 ? 'contained' : 'text'}
+                startIcon={<BarChartIcon />}
+                onClick={() => setActiveTab(1)}
+                size="small"
+                sx={{ textTransform: 'none' }}
+              >
+                Análisis
+              </Button>
+            </>
+          )}
+        </Stack>
+
+        {/* Mobile: botón template */}
+        {isMobile && (
+          <Button
+            variant="outlined"
+            startIcon={<ContentCopyIcon />}
+            onClick={() => setTemplateDialogOpen(true)}
+            fullWidth
+            size="small"
+            sx={{ mb: 1.5, textTransform: 'none' }}
+          >
+            Aplicar Template
+          </Button>
+        )}
+
+        {loading ? (
+          <Box sx={{ display: 'flex', justifyContent: 'center', py: 8 }}>
+            <CircularProgress />
+          </Box>
+        ) : (
+          <>
+            {activeTab === 0 && (
+              <ExpenseTable expenses={expenses} onEdit={handleEdit} onDelete={handleDelete} />
+            )}
+            {activeTab === 1 && (
+              <Charts allExpenses={allExpenses} currentYear={selectedYear} />
+            )}
+          </>
+        )}
+      </Container>
+
+      {/* Dialogs */}
+      <ExpenseDialog
+        open={dialogOpen}
+        onClose={() => {
+          setDialogOpen(false);
+          setEditingExpense(null);
+        }}
+        onSave={handleSaveExpense}
+        expense={editingExpense}
+        selectedMonth={selectedMonth}
+        selectedYear={selectedYear}
+      />
+
+      <Dialog open={templateDialogOpen} onClose={() => setTemplateDialogOpen(false)} maxWidth="sm" fullWidth>
+        <DialogTitle>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <ContentCopyIcon color="primary" />
+            <Typography variant="h6">Aplicar Template</Typography>
+          </Box>
+        </DialogTitle>
+        <DialogContent>
+          <Alert severity="info" sx={{ mb: 2 }}>
+            Los gastos se copiarán como "pendientes" sin valores.
+          </Alert>
+          <Typography variant="body2" sx={{ mb: 1.5, fontWeight: 600 }}>
+            Copiar gastos desde:
+          </Typography>
+          <Stack spacing={2}>
+            <FormControl fullWidth size="small">
+              <InputLabel>Mes origen</InputLabel>
+              <Select
+                value={templateSourceMonth}
+                label="Mes origen"
+                onChange={(e) => setTemplateSourceMonth(Number(e.target.value))}
+              >
+                {MONTHS.map((month, index) => (
+                  <MenuItem key={month} value={index + 1}>{month}</MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+            <FormControl fullWidth size="small">
+              <InputLabel>Año origen</InputLabel>
+              <Select
+                value={templateSourceYear}
+                label="Año origen"
+                onChange={(e) => setTemplateSourceYear(Number(e.target.value))}
+              >
+                {[2023, 2024, 2025, 2026, 2027].map((year) => (
+                  <MenuItem key={year} value={year}>{year}</MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+            <Alert severity="success">
+              Destino: <strong>{MONTHS[selectedMonth - 1]} {selectedYear}</strong>
+            </Alert>
+          </Stack>
+        </DialogContent>
+        <DialogActions sx={{ p: 2 }}>
+          <Button onClick={() => setTemplateDialogOpen(false)}>Cancelar</Button>
+          <Button onClick={handleApplyTemplate} variant="contained" startIcon={<ContentCopyIcon />}>
+            Aplicar
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      <ConfirmDialog
+        open={confirmDialogOpen}
+        title="Eliminar Gasto"
+        message="¿Estás seguro de que deseas eliminar este gasto?"
+        confirmText="Eliminar"
+        cancelText="Cancelar"
+        severity="warning"
+        onConfirm={confirmDelete}
+        onCancel={() => {
+          setConfirmDialogOpen(false);
+          setExpenseToDelete(null);
+        }}
+      />
+    </>
+  );
+};
