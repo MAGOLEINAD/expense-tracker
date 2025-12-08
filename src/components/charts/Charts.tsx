@@ -13,12 +13,13 @@ import {
 } from 'recharts';
 import ShowChartIcon from '@mui/icons-material/ShowChart';
 import BarChartIcon from '@mui/icons-material/BarChart';
-import type { Expense } from '@/types';
-import { MONTHS, CATEGORY_LABELS } from '@/utils';
+import type { Expense, UserCategory } from '@/types';
+import { MONTHS } from '@/utils';
 
 interface ChartsProps {
   allExpenses: Expense[];
   currentYear: number;
+  categories: UserCategory[];
 }
 
 const CustomTooltip = ({ active, payload, label }: any) => {
@@ -39,9 +40,20 @@ const CustomTooltip = ({ active, payload, label }: any) => {
   return null;
 };
 
-export const Charts = ({ allExpenses, currentYear }: ChartsProps) => {
+export const Charts = ({ allExpenses, currentYear, categories }: ChartsProps) => {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
+
+  // Crear un mapa de categoryId -> categoryName
+  const categoryMap = useMemo(() => {
+    const map: Record<string, string> = {};
+    categories.forEach(cat => {
+      if (cat.id) {
+        map[cat.id] = cat.name;
+      }
+    });
+    return map;
+  }, [categories]);
 
   // Obtener categorías únicas dinámicamente de los gastos del año actual
   const activeCategories = useMemo(() => {
@@ -81,13 +93,13 @@ export const Charts = ({ allExpenses, currentYear }: ChartsProps) => {
 
       // Agregar cada categoría activa con su label corto
       activeCategories.forEach(cat => {
-        const label = CATEGORY_LABELS[cat].split(' ')[0];
+        const label = (categoryMap[cat] || cat).split(' ')[0];
         result[label] = categoryTotals[cat];
       });
 
       return result;
     });
-  }, [allExpenses, currentYear, isMobile, activeCategories]);
+  }, [allExpenses, currentYear, isMobile, activeCategories, categoryMap]);
 
   const yearlyData = useMemo(() => {
     const years = [currentYear - 2, currentYear - 1, currentYear];
@@ -111,11 +123,11 @@ export const Charts = ({ allExpenses, currentYear }: ChartsProps) => {
       const total = categoryExpenses.reduce((sum, exp) => sum + exp.importe, 0);
 
       return {
-        name: CATEGORY_LABELS[category].split(' ')[0],
+        name: (categoryMap[category] || category).split(' ')[0],
         value: total,
       };
     }).filter(item => item.value > 0);
-  }, [allExpenses, currentYear, activeCategories]);
+  }, [allExpenses, currentYear, activeCategories, categoryMap]);
 
   const yearToDateTotal = monthlyData.reduce((sum, data) => sum + data.total, 0);
   const averageMonthly = yearToDateTotal / 12;
@@ -178,7 +190,7 @@ export const Charts = ({ allExpenses, currentYear }: ChartsProps) => {
                 <Tooltip content={<CustomTooltip />} />
                 {activeCategories.map((category, index) => {
                   const colors = ['#2196f3', '#8b5cf6', '#14b8a6', '#f59e0b', '#ef4444', '#10b981'];
-                  const label = CATEGORY_LABELS[category].split(' ')[0];
+                  const label = (categoryMap[category] || category).split(' ')[0];
                   return (
                     <Line
                       key={category}
@@ -198,7 +210,7 @@ export const Charts = ({ allExpenses, currentYear }: ChartsProps) => {
             <Stack direction="row" spacing={2} justifyContent="center" sx={{ mt: 1 }} flexWrap="wrap">
               {activeCategories.map((category, index) => {
                 const colors = ['#2196f3', '#8b5cf6', '#14b8a6', '#f59e0b', '#ef4444', '#10b981'];
-                const label = CATEGORY_LABELS[category].split(' ')[0];
+                const label = (categoryMap[category] || category).split(' ')[0];
                 return (
                   <Box key={category} sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
                     <Box sx={{ width: 12, height: 3, bgcolor: colors[index % colors.length], borderRadius: 1 }} />

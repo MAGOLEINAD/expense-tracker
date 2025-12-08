@@ -2,10 +2,8 @@ export type Currency = 'ARS' | 'USD';
 
 export type PaymentStatus = 'pagado' | 'bonificado' | 'pendiente';
 
-export type Category =
-  | 'IMPUESTOS_SERVICIOS'
-  | 'SERVICIOS_TARJETAS'
-  | 'FORD_KA';
+// Category is now a string since it's dynamic per user
+export type Category = string;
 
 export interface Expense {
   id?: string;

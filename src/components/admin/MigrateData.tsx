@@ -1,11 +1,13 @@
-import { Button, Paper, Typography, Alert } from '@mui/material';
+import { Button, Paper, Typography, Alert, CircularProgress } from '@mui/material';
 import { useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
-import { collection, addDoc } from 'firebase/firestore';
+import { collection, addDoc,  serverTimestamp } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
+import { useCategories } from '@/hooks/useCategories';
 
 export const MigrateData = () => {
   const { user } = useAuth();
+  const { categories, loading: categoriesLoading } = useCategories(user?.uid);
   const [status, setStatus] = useState<'idle' | 'migrating' | 'success' | 'error'>('idle');
   const [message, setMessage] = useState('');
 
@@ -174,11 +176,53 @@ export const MigrateData = () => {
     if (!user) return;
 
     setStatus('migrating');
-    setMessage('Migrando datos...');
+    setMessage('Preparando migración...');
 
     try {
+      // Paso 1: Crear categorías con los nombres correctos si no existen
+      setMessage('Creando/verificando categorías...');
+
+      const categoryMapping: Record<string, string> = {};
+      const requiredCategories = [
+        { oldName: 'IMPUESTOS_SERVICIOS', newName: 'Impuestos, Servicios e Inversiones' },
+        { oldName: 'SERVICIOS_TARJETAS', newName: 'Servicios y Tarjetas' },
+        { oldName: 'FORD_KA', newName: 'Ford Ka + SEL AT' },
+      ];
+
+      for (const { oldName, newName } of requiredCategories) {
+        // Buscar si ya existe una categoría con este nombre
+        let categoryId: string | undefined;
+        const existingCategory = categories.find(cat => cat.name === newName);
+
+        if (existingCategory && existingCategory.id) {
+          categoryId = existingCategory.id;
+        } else {
+          // Crear la categoría si no existe
+          const newCategoryRef = await addDoc(collection(db, 'categories'), {
+            userId: user.uid,
+            name: newName,
+            order: requiredCategories.findIndex(c => c.oldName === oldName) + 1,
+            createdAt: serverTimestamp(),
+            updatedAt: serverTimestamp(),
+          });
+          categoryId = newCategoryRef.id;
+        }
+
+        categoryMapping[oldName] = categoryId;
+      }
+
+      // Paso 2: Migrar los gastos usando los IDs de categorías
+      setMessage('Migrando gastos...');
       let count = 0;
+
       for (const expense of expensesDecember2025) {
+        const categoryId = categoryMapping[expense.category];
+
+        if (!categoryId) {
+          console.error(`No se encontró categoría para: ${expense.category}`);
+          continue;
+        }
+
         const expenseData = {
           userId: user.uid,
           item: expense.item,
@@ -188,11 +232,11 @@ export const MigrateData = () => {
           currency: expense.currency,
           pagadoPor: expense.pagadoPor,
           status: expense.status,
-          category: expense.category,
+          category: categoryId, // Usar el ID de la categoría
           month: 12,
           year: 2025,
-          createdAt: new Date(),
-          updatedAt: new Date(),
+          createdAt: serverTimestamp(),
+          updatedAt: serverTimestamp(),
         };
 
         await addDoc(collection(db, 'expenses'), expenseData);
@@ -209,6 +253,17 @@ export const MigrateData = () => {
     }
   };
 
+  if (categoriesLoading) {
+    return (
+      <Paper sx={{ p: 3, mb: 3, bgcolor: 'warning.light' }}>
+        <CircularProgress size={24} />
+        <Typography variant="body2" sx={{ ml: 2 }}>
+          Cargando categorías...
+        </Typography>
+      </Paper>
+    );
+  }
+
   return (
     <Paper sx={{ p: 3, mb: 3, bgcolor: 'warning.light' }}>
       <Typography variant="h6" gutterBottom>
@@ -216,6 +271,9 @@ export const MigrateData = () => {
       </Typography>
       <Typography variant="body2" sx={{ mb: 2 }}>
         Importar datos de Diciembre 2025 desde Excel
+      </Typography>
+      <Typography variant="caption" sx={{ mb: 2, display: 'block', color: 'text.secondary' }}>
+        Esto creará las categorías necesarias y migrará {expensesDecember2025.length} gastos.
       </Typography>
 
       {status === 'idle' && (

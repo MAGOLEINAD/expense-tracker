@@ -10,10 +10,8 @@ import {
   Stack,
 } from '@mui/material';
 import { useState, useEffect } from 'react';
-import type { Expense, Currency, PaymentStatus, Category } from '@/types';
+import type { Expense, Currency, PaymentStatus, UserCategory } from '@/types';
 import {
-  CATEGORIES,
-  CATEGORY_LABELS,
   PAYMENT_STATUSES,
   PAYMENT_STATUS_LABELS,
 } from '@/utils';
@@ -26,12 +24,8 @@ interface ExpenseDialogProps {
   expense?: Expense | null;
   selectedMonth: number;
   selectedYear: number;
+  categories: UserCategory[];
 }
-
-const categories: { value: Category; label: string }[] = CATEGORIES.map(cat => ({
-  value: cat,
-  label: CATEGORY_LABELS[cat],
-}));
 
 const statusOptions: { value: PaymentStatus; label: string }[] = PAYMENT_STATUSES.map(status => ({
   value: status,
@@ -46,7 +40,10 @@ export const ExpenseDialog = ({
   expense,
   selectedMonth,
   selectedYear,
+  categories,
 }: ExpenseDialogProps) => {
+  const defaultCategory = categories.length > 0 ? categories[0].id! : '';
+
   const [formData, setFormData] = useState<Partial<Expense>>({
     item: '',
     vto: format(new Date(), 'yyyy-MM-dd'),
@@ -55,7 +52,7 @@ export const ExpenseDialog = ({
     currency: 'ARS',
     pagadoPor: '',
     status: 'pendiente',
-    category: 'IMPUESTOS_SERVICIOS',
+    category: defaultCategory,
     month: selectedMonth,
     year: selectedYear,
   });
@@ -70,6 +67,7 @@ export const ExpenseDialog = ({
         fechaPago: expense.fechaPago && expense.fechaPago !== '' ? expense.fechaPago : today,
       });
     } else {
+      const newDefaultCategory = categories.length > 0 ? categories[0].id! : '';
       setFormData({
         item: '',
         vto: format(new Date(), 'yyyy-MM-dd'),
@@ -78,12 +76,12 @@ export const ExpenseDialog = ({
         currency: 'ARS',
         pagadoPor: '',
         status: 'pendiente',
-        category: 'IMPUESTOS_SERVICIOS',
+        category: newDefaultCategory,
         month: selectedMonth,
         year: selectedYear,
       });
     }
-  }, [expense, selectedMonth, selectedYear]);
+  }, [expense, selectedMonth, selectedYear, categories]);
 
   const handleSubmit = () => {
     onSave(formData);
@@ -100,11 +98,11 @@ export const ExpenseDialog = ({
             fullWidth
             label="Categoría"
             value={formData.category}
-            onChange={(e) => setFormData({ ...formData, category: e.target.value as Category })}
+            onChange={(e) => setFormData({ ...formData, category: e.target.value })}
           >
             {categories.map((cat) => (
-              <MenuItem key={cat.value} value={cat.value}>
-                {cat.label}
+              <MenuItem key={cat.id} value={cat.id}>
+                {cat.name}
               </MenuItem>
             ))}
           </TextField>

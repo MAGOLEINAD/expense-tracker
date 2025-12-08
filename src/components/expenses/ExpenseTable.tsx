@@ -13,6 +13,7 @@ import {
   Box,
   Collapse,
   Stack,
+  Tooltip,
   TextField,
   Dialog,
   DialogTitle,
@@ -20,7 +21,6 @@ import {
   DialogActions,
   Button,
   CircularProgress,
-  Tooltip,
 } from '@mui/material';
 import { DndContext, useSensor, useSensors, PointerSensor, useDraggable, useDroppable } from '@dnd-kit/core';
 import type { DragEndEvent } from '@dnd-kit/core';
@@ -34,13 +34,15 @@ import CreditCardIcon from '@mui/icons-material/CreditCard';
 import DirectionsCarIcon from '@mui/icons-material/DirectionsCar';
 import PaletteIcon from '@mui/icons-material/Palette';
 import DeleteSweepIcon from '@mui/icons-material/DeleteSweep';
-import type { Expense, Category, PaymentStatus } from '@/types';
-import { CATEGORY_LABELS, CATEGORIES } from '@/utils';
+import type { Expense, Category, PaymentStatus, UserCategory } from '@/types';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
+import { useCategories } from '@/hooks/useCategories';
+import { useAuth } from '@/contexts/AuthContext';
 
 interface ExpenseTableProps {
   expenses: Expense[];
+  categories: UserCategory[];
   onEdit: (expense: Expense) => void;
   onUpdate: (expense: Expense, previousExpense?: Expense) => void;
   onDelete: (id: string) => void;
@@ -72,15 +74,9 @@ const getStatusColor = (status: PaymentStatus) => {
   }
 };
 
-const getCategoryIcon = (category: Category) => {
-  switch (category) {
-    case 'IMPUESTOS_SERVICIOS':
-      return <ReceiptIcon />;
-    case 'SERVICIOS_TARJETAS':
-      return <CreditCardIcon />;
-    case 'FORD_KA':
-      return <DirectionsCarIcon />;
-  }
+const getCategoryIcon = (categoryIndex: number) => {
+  const icons = [<ReceiptIcon />, <CreditCardIcon />, <DirectionsCarIcon />, <PaletteIcon />];
+  return icons[categoryIndex % icons.length];
 };
 
 const formatCurrency = (amount: number, currency: string) => {
@@ -92,23 +88,42 @@ const formatCurrency = (amount: number, currency: string) => {
   return currency === 'USD' ? `USD ${formatted}` : `$ ${formatted}`;
 };
 
-const DEFAULT_CATEGORY_COLORS = {
-  IMPUESTOS_SERVICIOS: { from: '#0288d1', to: '#01579b' },
-  SERVICIOS_TARJETAS: { from: '#8b5cf6', to: '#6d28d9' },
-  FORD_KA: { from: '#14b8a6', to: '#0d9488' },
+const DEFAULT_CATEGORY_COLORS = [
+  { from: '#0288d1', to: '#01579b' },
+  { from: '#8b5cf6', to: '#6d28d9' },
+  { from: '#14b8a6', to: '#0d9488' },
+  { from: '#f59e0b', to: '#dc2626' },
+  { from: '#10b981', to: '#059669' },
+];
+
+const DEFAULT_CATEGORY_COLORS_MAP: Record<string, { from: string; to: string }> = {};
+
+const getCategoryColor = (category: UserCategory | undefined, categoryIndex: number) => {
+  // Si la categoría tiene colores personalizados, usarlos
+  if (category?.colorFrom && category?.colorTo) {
+    return { from: category.colorFrom, to: category.colorTo };
+  }
+  // Si no, usar color por defecto según índice
+  return DEFAULT_CATEGORY_COLORS[categoryIndex % DEFAULT_CATEGORY_COLORS.length];
 };
 
-export const ExpenseTable = ({ expenses, onEdit, onUpdate, onDelete, onDeleteMultiple }: ExpenseTableProps) => {
+export const ExpenseTable = ({ expenses, categories, onEdit, onUpdate, onDelete, onDeleteMultiple }: ExpenseTableProps) => {
+  const { user } = useAuth();
+  const { updateCategoryColors } = useCategories(user?.uid);
   const [usdRate, setUsdRate] = useState<number>(1200);
-  const [expandedCategories, setExpandedCategories] = useState<Set<Category>>(
-    new Set(['IMPUESTOS_SERVICIOS', 'SERVICIOS_TARJETAS', 'FORD_KA'])
-  );
+  const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set());
   const [editingCell, setEditingCell] = useState<{ id: string; field: string } | null>(null);
   const [editValue, setEditValue] = useState<string>('');
-  const [categoryColors, setCategoryColors] = useState(DEFAULT_CATEGORY_COLORS);
-  const [editingColor, setEditingColor] = useState<Category | null>(null);
-  const [deleteCategoryDialog, setDeleteCategoryDialog] = useState<Category | null>(null);
+  const [editingColor, setEditingColor] = useState<string | null>(null);
+  const [tempColorFrom, setTempColorFrom] = useState<string>('');
+  const [tempColorTo, setTempColorTo] = useState<string>('');
+  const [deleteCategoryDialog, setDeleteCategoryDialog] = useState<string | null>(null);
   const [isDeletingCategory, setIsDeletingCategory] = useState(false);
+
+  // Inicializar expandedCategories con todas las categorías
+  useEffect(() => {
+    setExpandedCategories(new Set(categories.map(cat => cat.id!)));
+  }, [categories]);
 
   useEffect(() => {
     fetch('https://dolarapi.com/v1/dolares/blue')
@@ -123,13 +138,13 @@ export const ExpenseTable = ({ expenses, onEdit, onUpdate, onDelete, onDeleteMul
       });
   }, []);
 
-  const toggleCategory = (category: Category) => {
+  const toggleCategory = (categoryId: string) => {
     setExpandedCategories(prev => {
       const newSet = new Set(prev);
-      if (newSet.has(category)) {
-        newSet.delete(category);
+      if (newSet.has(categoryId)) {
+        newSet.delete(categoryId);
       } else {
-        newSet.add(category);
+        newSet.add(categoryId);
       }
       return newSet;
     });
@@ -212,8 +227,8 @@ export const ExpenseTable = ({ expenses, onEdit, onUpdate, onDelete, onDeleteMul
   };
 
   // Obtener solo las categorías que tienen gastos
-  const categoryTotals = CATEGORIES.map(category => {
-    const categoryExpenses = expenses.filter(exp => exp.category === category);
+  const categoryTotals = categories.map((userCategory, index) => {
+    const categoryExpenses = expenses.filter(exp => exp.category === userCategory.id);
     const totalARS = categoryExpenses
       .filter(exp => exp.currency === 'ARS')
       .reduce((sum, exp) => sum + exp.importe, 0);
@@ -222,7 +237,9 @@ export const ExpenseTable = ({ expenses, onEdit, onUpdate, onDelete, onDeleteMul
       .reduce((sum, exp) => sum + exp.importe, 0);
 
     return {
-      category,
+      categoryId: userCategory.id!,
+      categoryName: userCategory.name,
+      categoryIndex: index,
       expenses: categoryExpenses,
       totalARS,
       totalUSD,
@@ -278,9 +295,9 @@ export const ExpenseTable = ({ expenses, onEdit, onUpdate, onDelete, onDeleteMul
   };
 
   // Componente para zona de drop
-  const DroppableCategory = ({ category, children }: { category: Category; children: React.ReactNode }) => {
+  const DroppableCategory = ({ categoryId, children }: { categoryId: string; children: React.ReactNode }) => {
     const { setNodeRef, isOver } = useDroppable({
-      id: category,
+      id: categoryId,
     });
 
     return (
@@ -321,8 +338,11 @@ export const ExpenseTable = ({ expenses, onEdit, onUpdate, onDelete, onDeleteMul
         </Paper>
       ) : (
         <Stack spacing={1.5}>
-        {categoryTotals.map(({ category, expenses: catExpenses, totalARS, totalUSD, totalInARS }) => (
-          <DroppableCategory key={category} category={category}>
+        {categoryTotals.map(({ categoryId, categoryName, categoryIndex, expenses: catExpenses, totalARS, totalUSD, totalInARS }) => {
+          const category = categories.find(c => c.id === categoryId);
+          const colors = getCategoryColor(category, categoryIndex);
+          return (
+          <DroppableCategory key={categoryId} categoryId={categoryId}>
             <Paper
               elevation={3}
               sx={{
@@ -337,7 +357,7 @@ export const ExpenseTable = ({ expenses, onEdit, onUpdate, onDelete, onDeleteMul
               sx={{
                 display: 'flex',
                 alignItems: 'center',
-                background: `linear-gradient(135deg, ${categoryColors[category].from} 0%, ${categoryColors[category].to} 100%)`,
+                background: `linear-gradient(135deg, ${colors.from} 0%, ${colors.to} 100%)`,
                 color: 'white',
                 py: 0.75,
                 px: 1.5,
@@ -345,7 +365,7 @@ export const ExpenseTable = ({ expenses, onEdit, onUpdate, onDelete, onDeleteMul
               }}
             >
               <Box
-                onClick={() => toggleCategory(category)}
+                onClick={() => toggleCategory(categoryId)}
                 sx={{
                   display: 'flex',
                   alignItems: 'center',
@@ -354,10 +374,10 @@ export const ExpenseTable = ({ expenses, onEdit, onUpdate, onDelete, onDeleteMul
                 }}
               >
                 <Box sx={{ mr: 1.5, display: 'flex', alignItems: 'center', fontSize: '1rem' }}>
-                  {getCategoryIcon(category)}
+                  {getCategoryIcon(categoryIndex)}
                 </Box>
                 <Typography variant="body2" sx={{ flexGrow: 1, fontWeight: 700, fontSize: '0.875rem' }}>
-                  {CATEGORY_LABELS[category]}
+                  {categoryName}
                 </Typography>
                 <Typography variant="body2" sx={{ fontWeight: 600, fontSize: '0.875rem', mr: 1 }}>
                   {totalARS > 0 && `$ ${totalARS.toLocaleString('es-AR', { maximumFractionDigits: 0 })}`}
@@ -372,7 +392,7 @@ export const ExpenseTable = ({ expenses, onEdit, onUpdate, onDelete, onDeleteMul
                   {catExpenses.length} {catExpenses.length === 1 ? 'item' : 'items'}
                 </Typography>
                 <IconButton size="small" sx={{ color: 'white', p: 0.5 }}>
-                  {expandedCategories.has(category) ? <ExpandLessIcon fontSize="small" /> : <ExpandMoreIcon fontSize="small" />}
+                  {expandedCategories.has(categoryId) ? <ExpandLessIcon fontSize="small" /> : <ExpandMoreIcon fontSize="small" />}
                 </IconButton>
               </Box>
 
@@ -381,7 +401,10 @@ export const ExpenseTable = ({ expenses, onEdit, onUpdate, onDelete, onDeleteMul
                 size="small"
                 onClick={(e) => {
                   e.stopPropagation();
-                  setEditingColor(category);
+                  setEditingColor(categoryId);
+                  // Inicializar colores temporales
+                  setTempColorFrom(category?.colorFrom || colors.from);
+                  setTempColorTo(category?.colorTo || colors.to);
                 }}
                 sx={{ color: 'white', p: 0.5, ml: 0.5 }}
               >
@@ -391,7 +414,7 @@ export const ExpenseTable = ({ expenses, onEdit, onUpdate, onDelete, onDeleteMul
                 size="small"
                 onClick={(e) => {
                   e.stopPropagation();
-                  setDeleteCategoryDialog(category);
+                  setDeleteCategoryDialog(categoryId);
                 }}
                 sx={{ color: 'white', p: 0.5 }}
               >
@@ -400,7 +423,7 @@ export const ExpenseTable = ({ expenses, onEdit, onUpdate, onDelete, onDeleteMul
             </Box>
 
             {/* Category Content - Collapsible */}
-            <Collapse in={expandedCategories.has(category)} timeout="auto" unmountOnExit>
+            <Collapse in={expandedCategories.has(categoryId)} timeout="auto" unmountOnExit>
               <TableContainer sx={{ '& .MuiTable-root': { borderCollapse: 'separate' } }}>
                 <Table size="small" sx={{ borderSpacing: 0 }}>
                   <TableHead>
@@ -645,7 +668,8 @@ export const ExpenseTable = ({ expenses, onEdit, onUpdate, onDelete, onDeleteMul
             </Collapse>
           </Paper>
           </DroppableCategory>
-        ))}
+          );
+        })}
 
         {/* Grand Total Card */}
         <Paper
@@ -710,7 +734,7 @@ export const ExpenseTable = ({ expenses, onEdit, onUpdate, onDelete, onDeleteMul
         <DialogTitle>Personalizar Color</DialogTitle>
         <DialogContent>
           <Typography variant="body2" sx={{ mb: 2 }}>
-            {editingColor && CATEGORY_LABELS[editingColor]}
+            {editingColor && categories.find(c => c.id === editingColor)?.name}
           </Typography>
           <Stack spacing={2}>
             <Box>
@@ -720,15 +744,8 @@ export const ExpenseTable = ({ expenses, onEdit, onUpdate, onDelete, onDeleteMul
               <TextField
                 type="color"
                 fullWidth
-                value={editingColor ? categoryColors[editingColor].from : '#0288d1'}
-                onChange={(e) => {
-                  if (editingColor) {
-                    setCategoryColors(prev => ({
-                      ...prev,
-                      [editingColor]: { ...prev[editingColor], from: e.target.value }
-                    }));
-                  }
-                }}
+                value={tempColorFrom}
+                onChange={(e) => setTempColorFrom(e.target.value)}
               />
             </Box>
             <Box>
@@ -738,24 +755,15 @@ export const ExpenseTable = ({ expenses, onEdit, onUpdate, onDelete, onDeleteMul
               <TextField
                 type="color"
                 fullWidth
-                value={editingColor ? categoryColors[editingColor].to : '#01579b'}
-                onChange={(e) => {
-                  if (editingColor) {
-                    setCategoryColors(prev => ({
-                      ...prev,
-                      [editingColor]: { ...prev[editingColor], to: e.target.value }
-                    }));
-                  }
-                }}
+                value={tempColorTo}
+                onChange={(e) => setTempColorTo(e.target.value)}
               />
             </Box>
             <Box
               sx={{
                 p: 2,
                 borderRadius: 1,
-                background: editingColor
-                  ? `linear-gradient(135deg, ${categoryColors[editingColor].from} 0%, ${categoryColors[editingColor].to} 100%)`
-                  : 'linear-gradient(135deg, #0288d1 0%, #01579b 100%)',
+                background: `linear-gradient(135deg, ${tempColorFrom} 0%, ${tempColorTo} 100%)`,
                 color: 'white',
                 textAlign: 'center',
                 fontWeight: 700,
@@ -769,16 +777,30 @@ export const ExpenseTable = ({ expenses, onEdit, onUpdate, onDelete, onDeleteMul
           <Button
             onClick={() => {
               if (editingColor) {
-                setCategoryColors(prev => ({
-                  ...prev,
-                  [editingColor]: DEFAULT_CATEGORY_COLORS[editingColor]
-                }));
+                const categoryIndex = categories.findIndex(c => c.id === editingColor);
+                const category = categories[categoryIndex];
+                const defaultColors = getCategoryColor(category, categoryIndex);
+                setTempColorFrom(defaultColors.from);
+                setTempColorTo(defaultColors.to);
               }
             }}
           >
             Restaurar
           </Button>
-          <Button onClick={() => setEditingColor(null)}>Cerrar</Button>
+          <Button
+            onClick={async () => {
+              if (editingColor && updateCategoryColors) {
+                try {
+                  await updateCategoryColors(editingColor, tempColorFrom, tempColorTo);
+                } catch (error) {
+                  console.error('Error saving colors:', error);
+                }
+              }
+              setEditingColor(null);
+            }}
+          >
+            Guardar
+          </Button>
         </DialogActions>
       </Dialog>
 
@@ -800,7 +822,7 @@ export const ExpenseTable = ({ expenses, onEdit, onUpdate, onDelete, onDeleteMul
             <>
               <Typography variant="body2">
                 ¿Estás seguro de que deseas eliminar todos los gastos de{' '}
-                <strong>{deleteCategoryDialog && CATEGORY_LABELS[deleteCategoryDialog]}</strong>?
+                <strong>{deleteCategoryDialog && categories.find(c => c.id === deleteCategoryDialog)?.name}</strong>?
               </Typography>
               <Typography variant="body2" sx={{ mt: 1, color: 'error.main' }}>
                 Esta acción no se puede deshacer.
@@ -825,7 +847,7 @@ export const ExpenseTable = ({ expenses, onEdit, onUpdate, onDelete, onDeleteMul
                       if (onDeleteMultiple) {
                         await onDeleteMultiple(idsToDelete);
                       } else {
-                        // Fallback: eliminar uno por uno sin confirmación
+                        // Fallback: eliminar uno por uno
                         for (const id of idsToDelete) {
                           onDelete(id);
                         }

@@ -1,18 +1,4 @@
-import type { Category, PaymentStatus, Currency } from '@/types';
-
-// Categorías disponibles
-export const CATEGORIES: readonly Category[] = [
-  'IMPUESTOS_SERVICIOS',
-  'SERVICIOS_TARJETAS',
-  'FORD_KA',
-] as const;
-
-// Etiquetas legibles para categorías
-export const CATEGORY_LABELS: Record<Category, string> = {
-  IMPUESTOS_SERVICIOS: 'Impuestos, Servicios e Inversiones',
-  SERVICIOS_TARJETAS: 'Servicios y Tarjetas',
-  FORD_KA: 'Ford Ka + SEL AT',
-};
+import type { PaymentStatus, Currency } from '@/types';
 
 // Estados de pago disponibles
 export const PAYMENT_STATUSES: readonly PaymentStatus[] = [

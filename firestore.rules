@@ -15,5 +15,20 @@ service cloud.firestore {
       // Allow delete if user is authenticated and document belongs to them
       allow delete: if request.auth != null && resource.data.userId == request.auth.uid;
     }
+
+    // Users can only read/write their own categories
+    match /categories/{categoryId} {
+      // Allow read if user is authenticated
+      allow read: if request.auth != null;
+
+      // Allow create if user is authenticated and userId matches auth.uid
+      allow create: if request.auth != null && request.resource.data.userId == request.auth.uid;
+
+      // Allow update if user is authenticated and document belongs to them
+      allow update: if request.auth != null && resource.data.userId == request.auth.uid;
+
+      // Allow delete if user is authenticated and document belongs to them
+      allow delete: if request.auth != null && resource.data.userId == request.auth.uid;
+    }
   }
 }

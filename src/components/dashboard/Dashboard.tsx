@@ -41,12 +41,17 @@ import ListAltIcon from '@mui/icons-material/ListAlt';
 import MenuIcon from '@mui/icons-material/Menu';
 import { useAuth } from '@/contexts/AuthContext';
 import { useExpenses } from '@/hooks/useExpenses';
+import { useCategories } from '@/hooks/useCategories';
 import { ExpenseDialog } from '@/components/expenses/ExpenseDialog';
 import { ExpenseTable } from '@/components/expenses/ExpenseTable';
 import { Charts } from '@/components/charts/Charts';
 import { ConfirmDialog } from '@/components/common/ConfirmDialog';
+import { CategoryManager } from '@/components/categories/CategoryManager';
+import { MigrateData } from '@/components/admin/MigrateData';
+import { CleanupOldCategories } from '@/components/admin/CleanupOldCategories';
 import type { Expense } from '@/types';
 import { MONTHS } from '@/utils';
+import SettingsIcon from '@mui/icons-material/Settings';
 
 export const Dashboard = () => {
   const theme = useTheme();
@@ -69,11 +74,14 @@ export const Dashboard = () => {
   const [datePickerAnchor, setDatePickerAnchor] = useState<null | HTMLElement>(null);
   const [usdRates, setUsdRates] = useState({ compra: 0, venta: 0 });
   const [usdPopoverAnchor, setUsdPopoverAnchor] = useState<null | HTMLElement>(null);
+  const [categoryManagerOpen, setCategoryManagerOpen] = useState(false);
 
   const { expenses, allExpenses, loading, addExpense, updateExpense, deleteExpense, applyTemplate, clearMonth } = useExpenses(
     selectedMonth,
     selectedYear
   );
+
+  const { categories } = useCategories(user?.uid);
 
   // Fetch USD rate (Oficial)
   useEffect(() => {
@@ -399,6 +407,9 @@ export const Dashboard = () => {
               <Typography variant="body2" sx={{ fontWeight: 600 }}>{user?.displayName}</Typography>
             </MenuItem>
             <Divider />
+            <MenuItem onClick={() => { setCategoryManagerOpen(true); setAnchorEl(null); }}>
+              <SettingsIcon sx={{ mr: 1, fontSize: 18 }} /> Gestionar Categorías
+            </MenuItem>
             <MenuItem onClick={logout}>
               <LogoutIcon sx={{ mr: 1, fontSize: 18 }} /> Cerrar Sesión
             </MenuItem>
@@ -529,6 +540,10 @@ export const Dashboard = () => {
       </Popover>
 
       <Container maxWidth="xl" sx={{ py: isMobile ? 1 : 1.5, px: isMobile ? 1 : 2 }}>
+        {/* Admin Panel - Solo visible para usuario autorizado */}
+        <CleanupOldCategories />
+        <MigrateData />
+
         {/* Mobile: controles compactos */}
         {isMobile && (
           <>
@@ -609,6 +624,7 @@ export const Dashboard = () => {
             {activeTab === 0 && (
               <ExpenseTable
                 expenses={expenses}
+                categories={categories}
                 onEdit={handleEdit}
                 onUpdate={handleUpdate}
                 onDelete={handleDelete}
@@ -616,7 +632,7 @@ export const Dashboard = () => {
               />
             )}
             {activeTab === 1 && (
-              <Charts allExpenses={allExpenses} currentYear={selectedYear} />
+              <Charts allExpenses={allExpenses} currentYear={selectedYear} categories={categories} />
             )}
           </>
         )}
@@ -633,6 +649,7 @@ export const Dashboard = () => {
         expense={editingExpense}
         selectedMonth={selectedMonth}
         selectedYear={selectedYear}
+        categories={categories}
       />
 
       <Dialog open={templateDialogOpen} onClose={() => setTemplateDialogOpen(false)} maxWidth="sm" fullWidth>
@@ -711,6 +728,11 @@ export const Dashboard = () => {
           setConfirmDialogOpen(false);
           setExpenseToDelete(null);
         }}
+      />
+
+      <CategoryManager
+        open={categoryManagerOpen}
+        onClose={() => setCategoryManagerOpen(false)}
       />
     </>
   );

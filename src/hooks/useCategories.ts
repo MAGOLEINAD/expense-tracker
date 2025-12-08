@@ -1,0 +1,175 @@
+import { useState, useEffect } from 'react';
+import {
+  collection,
+  query,
+  where,
+  orderBy,
+  onSnapshot,
+  addDoc,
+  updateDoc,
+  deleteDoc,
+  doc,
+  getDocs,
+  serverTimestamp,
+} from 'firebase/firestore';
+import { db } from '@/lib/firebase';
+import type { UserCategory } from '@/types';
+
+export const useCategories = (userId: string | undefined) => {
+  const [categories, setCategories] = useState<UserCategory[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!userId) {
+      setCategories([]);
+      setLoading(false);
+      return;
+    }
+
+    const q = query(
+      collection(db, 'categories'),
+      where('userId', '==', userId),
+      orderBy('order', 'asc')
+    );
+
+    const unsubscribe = onSnapshot(
+      q,
+      async (snapshot) => {
+        const categoriesData = snapshot.docs.map((doc) => ({
+          id: doc.id,
+          ...doc.data(),
+          createdAt: doc.data().createdAt?.toDate() || new Date(),
+          updatedAt: doc.data().updatedAt?.toDate() || new Date(),
+        })) as UserCategory[];
+
+        // Si no hay categorías, crear las 3 por defecto
+        if (categoriesData.length === 0) {
+          await initializeDefaultCategories(userId);
+        } else {
+          setCategories(categoriesData);
+          setLoading(false);
+        }
+      },
+      (err) => {
+        console.error('Error fetching categories:', err);
+        setError(err.message);
+        setLoading(false);
+      }
+    );
+
+    return () => unsubscribe();
+  }, [userId]);
+
+  const initializeDefaultCategories = async (uid: string) => {
+    try {
+      const defaultCategories = [
+        { name: 'Categoría 1', order: 1 },
+        { name: 'Categoría 2', order: 2 },
+        { name: 'Categoría 3', order: 3 },
+      ];
+
+      for (const category of defaultCategories) {
+        await addDoc(collection(db, 'categories'), {
+          userId: uid,
+          name: category.name,
+          order: category.order,
+          createdAt: serverTimestamp(),
+          updatedAt: serverTimestamp(),
+        });
+      }
+    } catch (err) {
+      console.error('Error initializing categories:', err);
+      setError(err instanceof Error ? err.message : 'Error desconocido');
+    }
+  };
+
+  const addCategory = async (name: string) => {
+    if (!userId) return;
+
+    try {
+      const newOrder = categories.length + 1;
+      await addDoc(collection(db, 'categories'), {
+        userId,
+        name,
+        order: newOrder,
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      });
+    } catch (err) {
+      console.error('Error adding category:', err);
+      setError(err instanceof Error ? err.message : 'Error desconocido');
+      throw err;
+    }
+  };
+
+  const updateCategory = async (categoryId: string, newName: string) => {
+    if (!userId) return;
+
+    try {
+      const categoryRef = doc(db, 'categories', categoryId);
+      await updateDoc(categoryRef, {
+        name: newName,
+        updatedAt: serverTimestamp(),
+      });
+    } catch (err) {
+      console.error('Error updating category:', err);
+      setError(err instanceof Error ? err.message : 'Error desconocido');
+      throw err;
+    }
+  };
+
+  const updateCategoryColors = async (categoryId: string, colorFrom: string, colorTo: string) => {
+    if (!userId) return;
+
+    try {
+      const categoryRef = doc(db, 'categories', categoryId);
+      await updateDoc(categoryRef, {
+        colorFrom,
+        colorTo,
+        updatedAt: serverTimestamp(),
+      });
+    } catch (err) {
+      console.error('Error updating category colors:', err);
+      setError(err instanceof Error ? err.message : 'Error desconocido');
+      throw err;
+    }
+  };
+
+  const deleteCategory = async (categoryId: string) => {
+    if (!userId) return;
+
+    try {
+      // Verificar que no haya gastos usando esta categoría
+      const expensesQuery = query(
+        collection(db, 'expenses'),
+        where('userId', '==', userId),
+        where('category', '==', categoryId)
+      );
+      const expensesSnapshot = await getDocs(expensesQuery);
+
+      if (!expensesSnapshot.empty) {
+        throw new Error(
+          'No se puede eliminar una categoría que tiene gastos asociados'
+        );
+      }
+
+      const categoryRef = doc(db, 'categories', categoryId);
+      await deleteDoc(categoryRef);
+    } catch (err) {
+      console.error('Error deleting category:', err);
+      setError(err instanceof Error ? err.message : 'Error desconocido');
+      throw err;
+    }
+  };
+
+  return {
+    categories,
+    loading,
+    error,
+    addCategory,
+    updateCategory,
+    updateCategoryColors,
+    deleteCategory,
+  };
+};
