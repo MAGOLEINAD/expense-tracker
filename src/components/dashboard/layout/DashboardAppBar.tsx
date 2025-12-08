@@ -14,6 +14,7 @@ interface DashboardAppBarProps {
   selectedMonth: number;
   selectedYear: number;
   usdRates: { compra: number; venta: number };
+  loadingUsd: boolean;
   activeTab: number;
   userMenuAnchor: HTMLElement | null;
   onPreviousMonth: () => void;
@@ -36,6 +37,7 @@ export const DashboardAppBar = ({
   selectedMonth,
   selectedYear,
   usdRates,
+  loadingUsd,
   activeTab,
   userMenuAnchor,
   onPreviousMonth,
@@ -105,7 +107,7 @@ export const DashboardAppBar = ({
               showBorder
             />
 
-            <UsdRateDisplay venta={usdRates.venta} onClick={onOpenUsdPopover} />
+            <UsdRateDisplay venta={usdRates.venta} loading={loadingUsd} onClick={onOpenUsdPopover} />
 
             <Box sx={{ flexGrow: 1 }} />
 

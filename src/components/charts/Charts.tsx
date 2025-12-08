@@ -1,5 +1,5 @@
 import { useMemo, useState, useEffect } from 'react';
-import { Paper, Typography, Box, useMediaQuery, useTheme, Stack } from '@mui/material';
+import { Paper, Typography, Box, useMediaQuery, useTheme, Stack, CircularProgress } from '@mui/material';
 import {
   LineChart,
   Line,
@@ -36,6 +36,7 @@ export const Charts = ({ allExpenses, currentYear, currentMonth, categories }: C
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
   const [inflationData, setInflationData] = useState({ monthly: 0, annual: 0 });
   const [usdRate, setUsdRate] = useState<number>(1200);
+  const [loadingInflation, setLoadingInflation] = useState(true);
 
   // Fetch USD rate
   useEffect(() => {
@@ -53,6 +54,7 @@ export const Charts = ({ allExpenses, currentYear, currentMonth, categories }: C
 
   // Fetch inflation data from API
   useEffect(() => {
+    setLoadingInflation(true);
     fetch('https://api.argentinadatos.com/v1/finanzas/indices/inflacion')
       .then(res => res.json())
       .then(data => {
@@ -67,6 +69,9 @@ export const Charts = ({ allExpenses, currentYear, currentMonth, categories }: C
       })
       .catch(() => {
         console.log('Could not fetch inflation data');
+      })
+      .finally(() => {
+        setLoadingInflation(false);
       });
   }, []);
 
@@ -337,45 +342,63 @@ export const Charts = ({ allExpenses, currentYear, currentMonth, categories }: C
           <Typography variant="caption" sx={{ color: '#f57c00', fontSize: '0.7rem', display: 'block' }}>
             Inflación Mensual
           </Typography>
-          <Box sx={{ display: 'flex', gap: 0.5, alignItems: 'center', mt: 0.25, flexWrap: 'wrap' }}>
-            <Typography variant="h6" sx={{ fontWeight: 700, color: '#e65100' }}>
-              {inflationData.monthly.toFixed(1)}%
-            </Typography>
-            <Typography variant="caption" sx={{ color: '#f57c00', fontSize: '0.7rem' }}>
-              (oficial)
-            </Typography>
-            <Typography variant="caption" sx={{ color: '#f57c00', fontSize: '0.7rem', mx: 0.25 }}>
-              |
-            </Typography>
-            <Typography variant="h6" sx={{ fontWeight: 700, color: '#e65100' }}>
-              {myInflationData.monthly.toFixed(1)}%
-            </Typography>
-            <Typography variant="caption" sx={{ color: '#f57c00', fontSize: '0.7rem' }}>
-              (mis datos)
-            </Typography>
-          </Box>
+          {loadingInflation ? (
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 0.25 }}>
+              <CircularProgress size={20} sx={{ color: '#f57c00' }} />
+              <Typography variant="caption" sx={{ color: '#f57c00', fontSize: '0.7rem' }}>
+                Cargando...
+              </Typography>
+            </Box>
+          ) : (
+            <Box sx={{ display: 'flex', gap: 0.5, alignItems: 'center', mt: 0.25, flexWrap: 'wrap' }}>
+              <Typography variant="h6" sx={{ fontWeight: 700, color: '#e65100' }}>
+                {inflationData.monthly.toFixed(1)}%
+              </Typography>
+              <Typography variant="caption" sx={{ color: '#f57c00', fontSize: '0.7rem' }}>
+                (oficial)
+              </Typography>
+              <Typography variant="caption" sx={{ color: '#f57c00', fontSize: '0.7rem', mx: 0.25 }}>
+                |
+              </Typography>
+              <Typography variant="h6" sx={{ fontWeight: 700, color: '#e65100' }}>
+                {myInflationData.monthly.toFixed(1)}%
+              </Typography>
+              <Typography variant="caption" sx={{ color: '#f57c00', fontSize: '0.7rem' }}>
+                (mis datos)
+              </Typography>
+            </Box>
+          )}
         </Paper>
         <Paper elevation={1} sx={{ p: 1.5, borderRadius: 1, bgcolor: '#ffebee', border: '1px solid #ffcdd2', flex: 1 }}>
           <Typography variant="caption" sx={{ color: '#c62828', fontSize: '0.7rem', display: 'block' }}>
             Inflación Anual
           </Typography>
-          <Box sx={{ display: 'flex', gap: 0.5, alignItems: 'center', mt: 0.25, flexWrap: 'wrap' }}>
-            <Typography variant="h6" sx={{ fontWeight: 700, color: '#b71c1c' }}>
-              {inflationData.annual.toFixed(1)}%
-            </Typography>
-            <Typography variant="caption" sx={{ color: '#c62828', fontSize: '0.7rem' }}>
-              (oficial)
-            </Typography>
-            <Typography variant="caption" sx={{ color: '#c62828', fontSize: '0.7rem', mx: 0.25 }}>
-              |
-            </Typography>
-            <Typography variant="h6" sx={{ fontWeight: 700, color: '#b71c1c' }}>
-              {myInflationData.annual.toFixed(1)}%
-            </Typography>
-            <Typography variant="caption" sx={{ color: '#c62828', fontSize: '0.7rem' }}>
-              (mis datos)
-            </Typography>
-          </Box>
+          {loadingInflation ? (
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 0.25 }}>
+              <CircularProgress size={20} sx={{ color: '#c62828' }} />
+              <Typography variant="caption" sx={{ color: '#c62828', fontSize: '0.7rem' }}>
+                Cargando...
+              </Typography>
+            </Box>
+          ) : (
+            <Box sx={{ display: 'flex', gap: 0.5, alignItems: 'center', mt: 0.25, flexWrap: 'wrap' }}>
+              <Typography variant="h6" sx={{ fontWeight: 700, color: '#b71c1c' }}>
+                {inflationData.annual.toFixed(1)}%
+              </Typography>
+              <Typography variant="caption" sx={{ color: '#c62828', fontSize: '0.7rem' }}>
+                (oficial)
+              </Typography>
+              <Typography variant="caption" sx={{ color: '#c62828', fontSize: '0.7rem', mx: 0.25 }}>
+                |
+              </Typography>
+              <Typography variant="h6" sx={{ fontWeight: 700, color: '#b71c1c' }}>
+                {myInflationData.annual.toFixed(1)}%
+              </Typography>
+              <Typography variant="caption" sx={{ color: '#c62828', fontSize: '0.7rem' }}>
+                (mis datos)
+              </Typography>
+            </Box>
+          )}
         </Paper>
       </Stack>
 

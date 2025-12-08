@@ -44,6 +44,7 @@ export const Dashboard = () => {
   const [editingExpense, setEditingExpense] = useState<Expense | null>(null);
   const [expenseToDelete, setExpenseToDelete] = useState<string | null>(null);
   const [usdRates, setUsdRates] = useState({ compra: 0, venta: 0 });
+  const [loadingUsd, setLoadingUsd] = useState(true);
 
   // Custom Hooks
   const {
@@ -61,6 +62,7 @@ export const Dashboard = () => {
 
   // Fetch USD rate
   useEffect(() => {
+    setLoadingUsd(true);
     fetch('https://dolarapi.com/v1/dolares/oficial')
       .then((res) => res.json())
       .then((data) => {
@@ -71,6 +73,9 @@ export const Dashboard = () => {
       .catch(() => {
         console.log('Using default USD rate');
         setUsdRates({ compra: 1000, venta: 1020 });
+      })
+      .finally(() => {
+        setLoadingUsd(false);
       });
   }, []);
 
@@ -198,6 +203,7 @@ export const Dashboard = () => {
         selectedMonth={selectedMonth}
         selectedYear={selectedYear}
         usdRates={usdRates}
+        loadingUsd={loadingUsd}
         activeTab={activeTab}
         userMenuAnchor={anchorEl}
         onPreviousMonth={handlePreviousMonth}

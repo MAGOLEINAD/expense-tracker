@@ -189,12 +189,19 @@ export const ExpenseTable = ({ expenses, categories, onEdit, onUpdate, onDelete,
       event.stopPropagation();
     }
 
-    const updatedExpense = {
-      ...expense,
-      [editingCell.field]: editingCell.field === 'importe' ? Number(editValue) : editValue,
-    };
+    const newValue = editingCell.field === 'importe' ? Number(editValue) : editValue;
+    const oldValue = expense[editingCell.field as keyof Expense];
 
-    onUpdate(updatedExpense);
+    // Solo actualizar si el valor cambió
+    if (newValue !== oldValue) {
+      const updatedExpense = {
+        ...expense,
+        [editingCell.field]: newValue,
+      };
+
+      onUpdate(updatedExpense);
+    }
+
     setEditingCell(null);
     setEditValue('');
   };

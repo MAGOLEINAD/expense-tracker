@@ -1,4 +1,4 @@
-import { Box, Button, Container, Paper, Typography, Alert, Stack, Fade, Chip } from '@mui/material';
+import { Box, Button, Container, Paper, Typography, Alert, Stack, Fade, Chip, useMediaQuery, useTheme } from '@mui/material';
 import GoogleIcon from '@mui/icons-material/Google';
 import AccountBalanceWalletIcon from '@mui/icons-material/AccountBalanceWallet';
 import TrendingUpIcon from '@mui/icons-material/TrendingUp';
@@ -11,6 +11,8 @@ export const Login = () => {
   const { signInWithGoogle } = useAuth();
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('md'));
 
   const handleGoogleSignIn = async () => {
     try {
@@ -39,13 +41,13 @@ export const Login = () => {
     <Box
       sx={{
         width: '100vw',
-        height: '100vh',
+        minHeight: '100vh',
         display: 'flex',
         background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-        position: 'fixed',
+        position: isMobile ? 'relative' : 'fixed',
         top: 0,
         left: 0,
-        overflow: 'hidden',
+        overflow: isMobile ? 'auto' : 'hidden',
         '&::before': {
           content: '""',
           position: 'absolute',
@@ -74,7 +76,7 @@ export const Login = () => {
         },
       }}
     >
-      <Container maxWidth="lg" sx={{ position: 'relative', zIndex: 1, height: '100%', display: 'flex', alignItems: 'center' }}>
+      <Container maxWidth="lg" sx={{ position: 'relative', zIndex: 1, minHeight: '100%', display: 'flex', alignItems: 'center', py: isMobile ? 4 : 0 }}>
         <Box
           sx={{
             width: '100%',
