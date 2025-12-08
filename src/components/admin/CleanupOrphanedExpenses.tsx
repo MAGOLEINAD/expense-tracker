@@ -141,7 +141,7 @@ export const CleanupOrphanedExpenses = () => {
             Estos gastos están asociados a categorías que ya no existen:
           </Typography>
           <List dense>
-            {orphanedExpenses.map((expense, index) => (
+            {orphanedExpenses.map((expense) => (
               <ListItem key={expense.id} sx={{ borderBottom: '1px solid #e0e0e0' }}>
                 <ListItemText
                   primary={`${expense.item} - $${expense.importe.toLocaleString('es-AR')}`}

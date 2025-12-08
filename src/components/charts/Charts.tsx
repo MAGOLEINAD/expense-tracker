@@ -15,7 +15,6 @@ import {
   Legend,
   ResponsiveContainer,
 } from 'recharts';
-import TrendingUpIcon from '@mui/icons-material/TrendingUp';
 import PieChartIcon from '@mui/icons-material/PieChart';
 import BarChartIcon from '@mui/icons-material/BarChart';
 import ShowChartIcon from '@mui/icons-material/ShowChart';
@@ -404,7 +403,7 @@ export const Charts = ({ allExpenses, currentYear, currentMonth, categories }: C
                 fill="#8884d8"
                 dataKey="value"
               >
-                {categoryDistributionData.map((entry, index) => (
+                {categoryDistributionData.map((_entry, index) => (
                   <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                 ))}
               </Pie>
@@ -441,7 +440,7 @@ export const Charts = ({ allExpenses, currentYear, currentMonth, categories }: C
               />
               <Tooltip content={<CustomTooltip />} />
               <Bar dataKey="monto" name="Monto gastado" radius={[4, 4, 0, 0]}>
-                {categoryComparisonData.map((entry, index) => (
+                {categoryComparisonData.map((_entry, index) => (
                   <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                 ))}
               </Bar>

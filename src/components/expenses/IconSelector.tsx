@@ -6,7 +6,6 @@ import {
   TextField,
   Box,
   IconButton,
-  Grid,
   InputAdornment,
   Typography,
   Tooltip,
@@ -100,7 +99,7 @@ export const IconSelector = ({ open, selectedIcon, onClose, onSelect }: IconSele
         )}
 
         <Box sx={{ maxHeight: 400, overflowY: 'auto' }}>
-          <Grid container spacing={1}>
+          <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(80px, 1fr))', gap: 1 }}>
             {availableIcons.map((iconName) => {
               const IconComponent = (MuiIcons as any)[iconName];
               if (!IconComponent) return null;
@@ -108,7 +107,7 @@ export const IconSelector = ({ open, selectedIcon, onClose, onSelect }: IconSele
               const isSelected = selectedIcon === iconName;
 
               return (
-                <Grid item xs={3} sm={2} key={iconName}>
+                <Box key={iconName}>
                   <Tooltip title={iconName} arrow>
                     <IconButton
                       onClick={() => handleSelect(iconName)}
@@ -127,10 +126,10 @@ export const IconSelector = ({ open, selectedIcon, onClose, onSelect }: IconSele
                       <IconComponent sx={{ fontSize: 28, color: isSelected ? '#2196f3' : '#424242' }} />
                     </IconButton>
                   </Tooltip>
-                </Grid>
+                </Box>
               );
             })}
-          </Grid>
+          </Box>
         </Box>
 
         {availableIcons.length === 0 && (
