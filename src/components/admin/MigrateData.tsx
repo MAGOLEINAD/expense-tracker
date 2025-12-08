@@ -1,7 +1,7 @@
 import { Button, Paper, Typography, Alert, CircularProgress } from '@mui/material';
 import { useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
-import { collection, addDoc,  serverTimestamp } from 'firebase/firestore';
+import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { useCategories } from '@/hooks/useCategories';
 

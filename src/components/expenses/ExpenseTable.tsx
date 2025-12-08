@@ -96,8 +96,6 @@ const DEFAULT_CATEGORY_COLORS = [
   { from: '#10b981', to: '#059669' },
 ];
 
-const DEFAULT_CATEGORY_COLORS_MAP: Record<string, { from: string; to: string }> = {};
-
 const getCategoryColor = (category: UserCategory | undefined, categoryIndex: number) => {
   // Si la categoría tiene colores personalizados, usarlos
   if (category?.colorFrom && category?.colorTo) {
