@@ -170,6 +170,9 @@ export const useExpenses = (month: number, year: number) => {
           category: expense.category,
           currency: expense.currency,
           pagadoPor: expense.pagadoPor,
+          // Copiar icono y su color si existen
+          ...(expense.icon && { icon: expense.icon }),
+          ...(expense.iconColor && { iconColor: expense.iconColor }),
           // Campos vacíos/pendientes
           vto: '',
           fechaPago: '',

@@ -132,16 +132,7 @@ export const CategoryManager = ({ open, onClose }: CategoryManagerProps) => {
             <ListItem
               key={category.id}
               secondaryAction={
-                editingId === category.id ? (
-                  <Box display="flex" gap={1}>
-                    <Button size="small" onClick={handleSaveEdit}>
-                      Guardar
-                    </Button>
-                    <Button size="small" onClick={handleCancelEdit}>
-                      Cancelar
-                    </Button>
-                  </Box>
-                ) : (
+                editingId !== category.id && (
                   <Box>
                     <IconButton
                       edge="end"
@@ -157,16 +148,25 @@ export const CategoryManager = ({ open, onClose }: CategoryManagerProps) => {
               }
             >
               {editingId === category.id ? (
-                <TextField
-                  fullWidth
-                  value={editingName}
-                  onChange={(e) => setEditingName(e.target.value)}
-                  autoFocus
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') handleSaveEdit();
-                    if (e.key === 'Escape') handleCancelEdit();
-                  }}
-                />
+                <Box sx={{ display: 'flex', gap: 1, width: '100%', alignItems: 'center' }}>
+                  <TextField
+                    fullWidth
+                    value={editingName}
+                    onChange={(e) => setEditingName(e.target.value)}
+                    autoFocus
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') handleSaveEdit();
+                      if (e.key === 'Escape') handleCancelEdit();
+                    }}
+                    size="small"
+                  />
+                  <Button size="small" variant="contained" onClick={handleSaveEdit} sx={{ whiteSpace: 'nowrap' }}>
+                    Guardar
+                  </Button>
+                  <Button size="small" onClick={handleCancelEdit} sx={{ whiteSpace: 'nowrap' }}>
+                    Cancelar
+                  </Button>
+                </Box>
               ) : (
                 <ListItemText primary={category.name} />
               )}

@@ -15,6 +15,7 @@ import { MobileDateControls } from './layout/MobileDateControls';
 import { DatePickerPopover } from './navigation/DatePickerPopover';
 import { UsdRatePopover } from './info/UsdRatePopover';
 import { TemplateDialog } from './dialogs/TemplateDialog';
+import { MigrateDataFernando } from '@/components/admin/MigrateDataFernando';
 import type { Expense } from '@/types';
 
 export const Dashboard = () => {
@@ -243,9 +244,8 @@ export const Dashboard = () => {
       />
 
       <Container maxWidth="xl" sx={{ py: isMobile ? 1 : 1.5, px: isMobile ? 1 : 2 }}>
-        {/* Herramientas de administración */}
-        {/* <CleanupOrphanedExpenses />
-        <CleanupOldCategories /> */}
+
+
 
         {isMobile && (
           <MobileDateControls
