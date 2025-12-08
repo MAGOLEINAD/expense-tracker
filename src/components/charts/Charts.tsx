@@ -305,27 +305,34 @@ export const Charts = ({ allExpenses, currentYear, currentMonth, categories }: C
       <Stack direction={isMobile ? 'column' : 'row'} spacing={1.5} sx={{ mb: 2 }}>
         <Paper elevation={1} sx={{ p: 1.5, borderRadius: 1, bgcolor: '#f8fafc', border: '1px solid #e2e8f0', flex: 1 }}>
           <Typography variant="caption" sx={{ color: '#64748b', fontSize: '0.7rem', display: 'block' }}>
-            Total {currentYear}
+            Resumen {currentYear}
           </Typography>
-          <Typography variant="h6" sx={{ fontWeight: 700, color: '#1e293b', mt: 0.25 }}>
-            ${(yearToDateTotal / 1000).toFixed(0)}k
-          </Typography>
-        </Paper>
-        <Paper elevation={1} sx={{ p: 1.5, borderRadius: 1, bgcolor: '#f8fafc', border: '1px solid #e2e8f0', flex: 1 }}>
-          <Typography variant="caption" sx={{ color: '#64748b', fontSize: '0.7rem', display: 'block' }}>
-            Promedio mensual
-          </Typography>
-          <Typography variant="h6" sx={{ fontWeight: 700, color: '#1e293b', mt: 0.25 }}>
-            ${(averageMonthly / 1000).toFixed(0)}k
-          </Typography>
-        </Paper>
-        <Paper elevation={1} sx={{ p: 1.5, borderRadius: 1, bgcolor: '#f8fafc', border: '1px solid #e2e8f0', flex: 1 }}>
-          <Typography variant="caption" sx={{ color: '#64748b', fontSize: '0.7rem', display: 'block' }}>
-            Mes actual
-          </Typography>
-          <Typography variant="h6" sx={{ fontWeight: 700, color: '#1e293b', mt: 0.25 }}>
-            ${(currentMonthTotal / 1000).toFixed(0)}k
-          </Typography>
+          <Box sx={{ display: 'flex', gap: 0.5, alignItems: 'center', mt: 0.25, flexWrap: 'nowrap' }}>
+            <Typography variant="h6" sx={{ fontWeight: 700, color: '#1e293b', whiteSpace: 'nowrap' }}>
+              ${(yearToDateTotal / 1000).toFixed(0)}k
+            </Typography>
+            <Typography variant="caption" sx={{ color: '#64748b', fontSize: '0.7rem' }}>
+              (total)
+            </Typography>
+            <Typography variant="caption" sx={{ color: '#64748b', fontSize: '0.7rem', mx: 0.25 }}>
+              |
+            </Typography>
+            <Typography variant="h6" sx={{ fontWeight: 700, color: '#1e293b', whiteSpace: 'nowrap' }}>
+              ${(averageMonthly / 1000).toFixed(0)}k
+            </Typography>
+            <Typography variant="caption" sx={{ color: '#64748b', fontSize: '0.7rem' }}>
+              (prom)
+            </Typography>
+            <Typography variant="caption" sx={{ color: '#64748b', fontSize: '0.7rem', mx: 0.25 }}>
+              |
+            </Typography>
+            <Typography variant="h6" sx={{ fontWeight: 700, color: '#1e293b', whiteSpace: 'nowrap' }}>
+              ${(currentMonthTotal / 1000).toFixed(0)}k
+            </Typography>
+            <Typography variant="caption" sx={{ color: '#64748b', fontSize: '0.7rem' }}>
+              (mes)
+            </Typography>
+          </Box>
         </Paper>
         <Paper elevation={1} sx={{ p: 1.5, borderRadius: 1, bgcolor: '#fff3e0', border: '1px solid #ffe0b2', flex: 1 }}>
           <Typography variant="caption" sx={{ color: '#f57c00', fontSize: '0.7rem', display: 'block' }}>
@@ -335,7 +342,7 @@ export const Charts = ({ allExpenses, currentYear, currentMonth, categories }: C
             <Typography variant="h6" sx={{ fontWeight: 700, color: '#e65100' }}>
               {inflationData.monthly.toFixed(1)}%
             </Typography>
-            <Typography variant="caption" sx={{ color: '#f57c00', fontSize: '0.6rem' }}>
+            <Typography variant="caption" sx={{ color: '#f57c00', fontSize: '0.7rem' }}>
               (oficial)
             </Typography>
             <Typography variant="caption" sx={{ color: '#f57c00', fontSize: '0.7rem', mx: 0.25 }}>
@@ -344,7 +351,7 @@ export const Charts = ({ allExpenses, currentYear, currentMonth, categories }: C
             <Typography variant="h6" sx={{ fontWeight: 700, color: '#e65100' }}>
               {myInflationData.monthly.toFixed(1)}%
             </Typography>
-            <Typography variant="caption" sx={{ color: '#f57c00', fontSize: '0.6rem' }}>
+            <Typography variant="caption" sx={{ color: '#f57c00', fontSize: '0.7rem' }}>
               (mis datos)
             </Typography>
           </Box>
@@ -357,7 +364,7 @@ export const Charts = ({ allExpenses, currentYear, currentMonth, categories }: C
             <Typography variant="h6" sx={{ fontWeight: 700, color: '#b71c1c' }}>
               {inflationData.annual.toFixed(1)}%
             </Typography>
-            <Typography variant="caption" sx={{ color: '#c62828', fontSize: '0.6rem' }}>
+            <Typography variant="caption" sx={{ color: '#c62828', fontSize: '0.7rem' }}>
               (oficial)
             </Typography>
             <Typography variant="caption" sx={{ color: '#c62828', fontSize: '0.7rem', mx: 0.25 }}>
@@ -366,7 +373,7 @@ export const Charts = ({ allExpenses, currentYear, currentMonth, categories }: C
             <Typography variant="h6" sx={{ fontWeight: 700, color: '#b71c1c' }}>
               {myInflationData.annual.toFixed(1)}%
             </Typography>
-            <Typography variant="caption" sx={{ color: '#c62828', fontSize: '0.6rem' }}>
+            <Typography variant="caption" sx={{ color: '#c62828', fontSize: '0.7rem' }}>
               (mis datos)
             </Typography>
           </Box>
