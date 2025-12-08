@@ -22,8 +22,10 @@ import {
   Button,
   CircularProgress,
 } from '@mui/material';
-import { DndContext, useSensor, useSensors, PointerSensor, useDraggable, useDroppable } from '@dnd-kit/core';
-import type { DragEndEvent } from '@dnd-kit/core';
+import { DndContext, useSensor, useSensors, PointerSensor, useDroppable, DragOverlay, closestCenter } from '@dnd-kit/core';
+import type { DragEndEvent, DragStartEvent } from '@dnd-kit/core';
+import { SortableContext, useSortable, verticalListSortingStrategy, arrayMove } from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
 import DragIndicatorIcon from '@mui/icons-material/DragIndicator';
 import EditIcon from '@mui/icons-material/Edit';
 import DeleteIcon from '@mui/icons-material/Delete';
@@ -45,12 +47,13 @@ import { useAuth } from '@/contexts/AuthContext';
 import { CommentDialog } from './CommentDialog';
 import { DebtDialog } from './DebtDialog';
 import * as MuiIcons from '@mui/icons-material';
+import { useSnackbar } from 'notistack';
 
 interface ExpenseTableProps {
   expenses: Expense[];
   categories: UserCategory[];
   onEdit: (expense: Expense) => void;
-  onUpdate: (expense: Expense, previousExpense?: Expense) => void;
+  onUpdate: (expense: Expense, previousExpense?: Expense, silent?: boolean) => void;
   onDelete: (id: string) => void;
   onDeleteMultiple?: (ids: string[]) => Promise<void>;
 }
@@ -114,6 +117,7 @@ const getCategoryColor = (category: UserCategory | undefined, categoryIndex: num
 export const ExpenseTable = ({ expenses, categories, onEdit, onUpdate, onDelete, onDeleteMultiple }: ExpenseTableProps) => {
   const { user } = useAuth();
   const { updateCategoryColors } = useCategories(user?.uid);
+  const { enqueueSnackbar } = useSnackbar();
   const [usdRate, setUsdRate] = useState<number>(1200);
   const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set());
   const [editingCell, setEditingCell] = useState<{ id: string; field: string } | null>(null);
@@ -126,6 +130,7 @@ export const ExpenseTable = ({ expenses, categories, onEdit, onUpdate, onDelete,
   const [commentDialogOpen, setCommentDialogOpen] = useState(false);
   const [debtDialogOpen, setDebtDialogOpen] = useState(false);
   const [selectedExpense, setSelectedExpense] = useState<Expense | null>(null);
+  const [activeId, setActiveId] = useState<string | null>(null);
 
   // Inicializar expandedCategories con todas las categorías
   useEffect(() => {
@@ -213,23 +218,70 @@ export const ExpenseTable = ({ expenses, categories, onEdit, onUpdate, onDelete,
     })
   );
 
-  const handleDragEnd = (event: DragEndEvent) => {
+  const handleDragStart = (event: DragStartEvent) => {
+    setActiveId(event.active.id as string);
+  };
+
+  const handleDragEnd = async (event: DragEndEvent) => {
     const { active, over } = event;
+
+    setActiveId(null);
 
     if (!over) return;
 
     const expenseId = active.id as string;
-    const targetCategory = over.id as Category;
-
     const expense = expenses.find(exp => exp.id === expenseId);
 
-    if (expense && expense.category !== targetCategory) {
-      const previousExpense = { ...expense };
-      const updatedExpense = {
-        ...expense,
-        category: targetCategory,
-      };
-      onUpdate(updatedExpense, previousExpense);
+    if (!expense) return;
+
+    // Check if we're dropping on a category (moving between categories)
+    const isDroppableCategory = categories.some(cat => cat.id === over.id);
+
+    if (isDroppableCategory) {
+      const targetCategory = over.id as Category;
+
+      if (expense.category !== targetCategory) {
+        const previousExpense = { ...expense };
+        const updatedExpense = {
+          ...expense,
+          category: targetCategory,
+          order: 0, // Reset order when moving to new category
+        };
+        onUpdate(updatedExpense, previousExpense);
+      }
+    } else {
+      // We're reordering within the same category
+      const overId = over.id as string;
+
+      if (active.id !== overId) {
+        const category = expense.category;
+        const categoryExpenses = expenses
+          .filter(exp => exp.category === category)
+          .sort((a, b) => (a.order || 0) - (b.order || 0));
+
+        const oldIndex = categoryExpenses.findIndex(exp => exp.id === active.id);
+        const newIndex = categoryExpenses.findIndex(exp => exp.id === overId);
+
+        if (oldIndex !== -1 && newIndex !== -1) {
+          const reorderedExpenses = arrayMove(categoryExpenses, oldIndex, newIndex);
+
+          // Update order for all affected expenses silently
+          const updatePromises = reorderedExpenses.map((exp, index) => {
+            if (exp.id) {
+              const updatedExpense = {
+                ...exp,
+                order: index,
+              };
+              return onUpdate(updatedExpense, undefined, true); // silent = true
+            }
+            return Promise.resolve();
+          });
+
+          // Wait for all updates and show a single message
+          await Promise.all(updatePromises);
+          enqueueSnackbar('Gastos reordenados exitosamente', { variant: 'success' });
+        }
+      }
     }
   };
 
@@ -279,7 +331,9 @@ export const ExpenseTable = ({ expenses, categories, onEdit, onUpdate, onDelete,
 
   // Obtener solo las categorías que tienen gastos
   const categoryTotals = categories.map((userCategory, index) => {
-    const categoryExpenses = expenses.filter(exp => exp.category === userCategory.id);
+    const categoryExpenses = expenses
+      .filter(exp => exp.category === userCategory.id)
+      .sort((a, b) => (a.order || 0) - (b.order || 0)); // Sort by order
     const totalARS = categoryExpenses
       .filter(exp => exp.currency === 'ARS')
       .reduce((sum, exp) => sum + exp.importe, 0);
@@ -306,18 +360,25 @@ export const ExpenseTable = ({ expenses, categories, onEdit, onUpdate, onDelete,
   const totalDebt = expenses.reduce((sum, exp) => sum + (exp.debt || 0), 0);
 
   // Componente para fila arrastrable
-  const DraggableRow = ({ expense, children }: { expense: Expense; children: React.ReactNode }) => {
-    const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
+  const SortableRow = ({ expense, children }: { expense: Expense; children: React.ReactNode }) => {
+    const {
+      attributes,
+      listeners,
+      setNodeRef,
+      transform,
+      transition,
+      isDragging,
+    } = useSortable({
       id: expense.id || '',
       data: { expense },
     });
 
-    const style = transform
-      ? {
-          transform: `translate3d(${transform.x}px, ${transform.y}px, 0)`,
-          opacity: isDragging ? 0.5 : 1,
-        }
-      : {};
+    const style = {
+      transform: CSS.Transform.toString(transform),
+      transition,
+      opacity: isDragging ? 0.5 : 1,
+      zIndex: isDragging ? 1 : 0,
+    };
 
     return (
       <TableRow
@@ -370,7 +431,12 @@ export const ExpenseTable = ({ expenses, categories, onEdit, onUpdate, onDelete,
   };
 
   return (
-    <DndContext sensors={sensors} onDragEnd={handleDragEnd}>
+    <DndContext
+      sensors={sensors}
+      collisionDetection={closestCenter}
+      onDragStart={handleDragStart}
+      onDragEnd={handleDragEnd}
+    >
       <Box>
       {categoryTotals.length === 0 ? (
         <Paper
@@ -507,6 +573,10 @@ export const ExpenseTable = ({ expenses, categories, onEdit, onUpdate, onDelete,
                     </TableRow>
                   </TableHead>
                   <TableBody>
+                    <SortableContext
+                      items={catExpenses.map(exp => exp.id || '')}
+                      strategy={verticalListSortingStrategy}
+                    >
                     {catExpenses.length === 0 ? (
                       <TableRow>
                         <TableCell
@@ -523,7 +593,7 @@ export const ExpenseTable = ({ expenses, categories, onEdit, onUpdate, onDelete,
                       </TableRow>
                     ) : (
                       catExpenses.map((expense) => (
-                        <DraggableRow key={expense.id} expense={expense}>
+                        <SortableRow key={expense.id} expense={expense}>
                           <TableCell
                             sx={{ fontWeight: 500, cursor: 'pointer' }}
                             onDoubleClick={(e) => {
@@ -546,7 +616,14 @@ export const ExpenseTable = ({ expenses, categories, onEdit, onUpdate, onDelete,
                               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                                 {expense.icon && (() => {
                                   const IconComponent = (MuiIcons as any)[expense.icon];
-                                  return IconComponent ? <IconComponent sx={{ fontSize: 20, color: '#2196f3' }} /> : null;
+                                  return IconComponent ? (
+                                    <IconComponent
+                                      sx={{
+                                        fontSize: 20,
+                                        color: expense.iconColor || '#2196f3'
+                                      }}
+                                    />
+                                  ) : null;
                                 })()}
                                 <span>{expense.item}</span>
                               </Box>
@@ -708,9 +785,10 @@ export const ExpenseTable = ({ expenses, categories, onEdit, onUpdate, onDelete,
                               <DeleteIcon fontSize="small" />
                             </IconButton>
                           </TableCell>
-                        </DraggableRow>
+                        </SortableRow>
                       ))
                     )}
+                    </SortableContext>
 
                     {/* Category Subtotal */}
                     {catExpenses.length > 0 && (
@@ -988,6 +1066,25 @@ export const ExpenseTable = ({ expenses, categories, onEdit, onUpdate, onDelete,
         }}
         onSave={handleSaveDebt}
       />
+
+      {/* DragOverlay para mostrar el elemento que se está arrastrando */}
+      <DragOverlay>
+        {activeId ? (
+          <Box
+            sx={{
+              bgcolor: 'white',
+              p: 1.5,
+              borderRadius: 1,
+              boxShadow: 3,
+              opacity: 0.9,
+            }}
+          >
+            <Typography variant="body2" fontWeight="bold">
+              {expenses.find(exp => exp.id === activeId)?.item || 'Moviendo...'}
+            </Typography>
+          </Box>
+        ) : null}
+      </DragOverlay>
     </Box>
     </DndContext>
   );

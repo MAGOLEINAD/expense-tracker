@@ -99,21 +99,25 @@ export const Dashboard = () => {
     setDialogOpen(true);
   };
 
-  const handleUpdate = async (expense: Expense, previousExpense?: Expense) => {
+  const handleUpdate = async (expense: Expense, previousExpense?: Expense, silent?: boolean) => {
     if (!expense.id) return;
     try {
       await updateExpense(expense.id, expense);
 
-      const categoryChanged = previousExpense && previousExpense.category !== expense.category;
+      if (!silent) {
+        const categoryChanged = previousExpense && previousExpense.category !== expense.category;
 
-      if (categoryChanged) {
-        enqueueSnackbar('Gasto trasladado de categoría', { variant: 'info' });
-      } else {
-        enqueueSnackbar('Gasto actualizado exitosamente', { variant: 'success' });
+        if (categoryChanged) {
+          enqueueSnackbar('Gasto trasladado de categoría', { variant: 'info' });
+        } else {
+          enqueueSnackbar('Gasto actualizado exitosamente', { variant: 'success' });
+        }
       }
     } catch (error) {
       console.error('Error updating expense:', error);
-      enqueueSnackbar('Error al actualizar el gasto', { variant: 'error' });
+      if (!silent) {
+        enqueueSnackbar('Error al actualizar el gasto', { variant: 'error' });
+      }
     }
   };
 

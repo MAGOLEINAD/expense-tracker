@@ -52,6 +52,7 @@ export const ExpenseDialog = ({
   const [formData, setFormData] = useState<Partial<Expense>>({
     item: '',
     icon: undefined,
+    iconColor: '#2196f3',
     vto: format(new Date(), 'yyyy-MM-dd'),
     fechaPago: format(new Date(), 'yyyy-MM-dd'),
     importe: 0,
@@ -81,6 +82,7 @@ export const ExpenseDialog = ({
       setFormData({
         item: '',
         icon: undefined,
+        iconColor: '#2196f3',
         vto: format(new Date(), 'yyyy-MM-dd'),
         fechaPago: format(new Date(), 'yyyy-MM-dd'),
         importe: 0,
@@ -136,7 +138,7 @@ export const ExpenseDialog = ({
               InputProps={{
                 startAdornment: SelectedIconComponent && (
                   <InputAdornment position="start">
-                    <SelectedIconComponent sx={{ color: '#2196f3' }} />
+                    <SelectedIconComponent sx={{ color: formData.iconColor || '#2196f3' }} />
                   </InputAdornment>
                 ),
               }}
@@ -148,6 +150,15 @@ export const ExpenseDialog = ({
             >
               <SearchIcon />
             </IconButton>
+            {formData.icon && (
+              <TextField
+                type="color"
+                value={formData.iconColor || '#2196f3'}
+                onChange={(e) => setFormData({ ...formData, iconColor: e.target.value })}
+                sx={{ width: 80, flexShrink: 0 }}
+                InputLabelProps={{ shrink: true }}
+              />
+            )}
             <TextField
               fullWidth
               label="Pagado Por"

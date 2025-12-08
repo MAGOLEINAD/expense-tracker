@@ -1,5 +1,6 @@
-import { CssBaseline, ThemeProvider, createTheme, CircularProgress, Box } from '@mui/material';
-import { SnackbarProvider } from 'notistack';
+import { CssBaseline, ThemeProvider, createTheme, CircularProgress, Box, IconButton } from '@mui/material';
+import { SnackbarProvider, closeSnackbar } from 'notistack';
+import CloseIcon from '@mui/icons-material/Close';
 import { AuthProvider, useAuth } from '@/contexts/AuthContext';
 import { Login } from '@/components/auth/Login';
 import { Dashboard } from '@/components/dashboard/Dashboard';
@@ -130,6 +131,16 @@ function App() {
           horizontal: 'right',
         }}
         autoHideDuration={3000}
+        action={(snackbarId) => (
+          <IconButton
+            size="small"
+            aria-label="close"
+            color="inherit"
+            onClick={() => closeSnackbar(snackbarId)}
+          >
+            <CloseIcon fontSize="small" />
+          </IconButton>
+        )}
       >
         <AuthProvider>
           <AppContent />
