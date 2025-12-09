@@ -154,6 +154,8 @@ export const CategoryManager = ({ open, onClose }: CategoryManagerProps) => {
     ];
 
     try {
+      console.log('🔍 Usuario actual:', user.uid, user.email);
+
       const categoriesQuery = query(
         collection(db, 'categories'),
         where('userId', '==', user.uid)
@@ -162,26 +164,37 @@ export const CategoryManager = ({ open, onClose }: CategoryManagerProps) => {
       const snapshot = await getDocs(categoriesQuery);
       let updated = 0;
       let skipped = 0;
+      let fixedUserId = 0;
+
+      console.log(`📊 Encontradas ${snapshot.docs.length} categorías`);
 
       for (let i = 0; i < snapshot.docs.length; i++) {
         const categoryDoc = snapshot.docs[i];
         const data = categoryDoc.data();
 
-        const needsColors = !data.colorFrom || !data.colorTo;
-        const needsUserId = !data.userId;
+        console.log(`Categoría "${data.name}":`, {
+          id: categoryDoc.id,
+          userId: data.userId,
+          hasColors: !!(data.colorFrom && data.colorTo),
+        });
 
-        // Si ya tiene todo, saltarla
-        if (!needsColors && !needsUserId) {
+        const needsColors = !data.colorFrom || !data.colorTo;
+        const wrongUserId = data.userId && data.userId !== user.uid;
+
+        // Si ya tiene todo correctamente, saltarla
+        if (!needsColors && !wrongUserId) {
           skipped++;
           continue;
         }
 
         // Preparar actualización
-        const updateData: any = {};
+        const updateData: any = {
+          userId: user.uid, // SIEMPRE corregir el userId
+        };
 
-        // Agregar userId si no existe
-        if (needsUserId) {
-          updateData.userId = user.uid;
+        if (wrongUserId) {
+          fixedUserId++;
+          console.log(`⚠️ Corrigiendo userId de "${data.userId}" a "${user.uid}"`);
         }
 
         // Asignar colores por defecto si no existen
@@ -198,12 +211,12 @@ export const CategoryManager = ({ open, onClose }: CategoryManagerProps) => {
         updated++;
       }
 
-      setMigrationMessage(`✅ Migración completada: ${updated} categorías actualizadas, ${skipped} ya tenían colores`);
+      setMigrationMessage(`✅ Migración completada: ${updated} actualizadas (${fixedUserId} con userId corregido), ${skipped} ya estaban bien`);
 
-      // Limpiar mensaje después de 5 segundos
+      // Limpiar mensaje después de 8 segundos
       setTimeout(() => {
         setMigrationMessage('');
-      }, 5000);
+      }, 8000);
     } catch (error) {
       console.error('Error durante la migración:', error);
       setMigrationMessage(`❌ Error: ${error instanceof Error ? error.message : 'Error desconocido'}`);
