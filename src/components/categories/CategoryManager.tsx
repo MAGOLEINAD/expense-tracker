@@ -359,14 +359,7 @@ export const CategoryManager = ({ open, onClose }: CategoryManagerProps) => {
         )}
       </DialogContent>
       <DialogActions>
-        <Button
-          startIcon={<BuildIcon />}
-          onClick={handleMigrateCategories}
-          disabled={isMigrating}
-          color="warning"
-        >
-          {isMigrating ? 'Migrando...' : 'Migrar Categorías'}
-        </Button>
+      
         <Box sx={{ flexGrow: 1 }} />
         <Button onClick={onClose}>Cerrar</Button>
       </DialogActions>
