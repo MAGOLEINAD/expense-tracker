@@ -24,8 +24,14 @@ service cloud.firestore {
       // Allow create if user is authenticated and userId matches auth.uid
       allow create: if request.auth != null && request.resource.data.userId == request.auth.uid;
 
-      // Allow update if user is authenticated and document belongs to them
-      allow update: if request.auth != null && resource.data.userId == request.auth.uid;
+      // Allow update if user is authenticated and:
+      // - Document belongs to them (resource.data.userId == request.auth.uid)
+      // - OR document doesn't have userId yet (for migration of old categories)
+      // - AND the userId field is not being changed or is being set correctly
+      allow update: if request.auth != null && (
+        (resource.data.userId == request.auth.uid && request.resource.data.userId == request.auth.uid) ||
+        (!('userId' in resource.data) && request.resource.data.userId == request.auth.uid)
+      );
 
       // Allow delete if user is authenticated and document belongs to them
       allow delete: if request.auth != null && resource.data.userId == request.auth.uid;

@@ -18,10 +18,13 @@ import {
 } from '@mui/material';
 import { Edit as EditIcon, Delete as DeleteIcon, Add as AddIcon } from '@mui/icons-material';
 import SearchIcon from '@mui/icons-material/Search';
+import BuildIcon from '@mui/icons-material/Build';
 import { useAuth } from '@/contexts/AuthContext';
 import { useCategories } from '@/hooks/useCategories';
 import { IconSelector } from '@/components/expenses/IconSelector';
 import * as MuiIcons from '@mui/icons-material';
+import { collection, getDocs, doc, updateDoc, query, where } from 'firebase/firestore';
+import { db } from '@/lib/firebase';
 
 interface CategoryManagerProps {
   open: boolean;
@@ -43,6 +46,8 @@ export const CategoryManager = ({ open, onClose }: CategoryManagerProps) => {
   const [expenseCount, setExpenseCount] = useState(0);
   const [iconSelectorOpen, setIconSelectorOpen] = useState(false);
   const [editingIconCategoryId, setEditingIconCategoryId] = useState<string | null>(null);
+  const [isMigrating, setIsMigrating] = useState(false);
+  const [migrationMessage, setMigrationMessage] = useState<string>('');
 
   const handleStartEdit = (id: string, currentName: string) => {
     setEditingId(id);
@@ -131,6 +136,79 @@ export const CategoryManager = ({ open, onClose }: CategoryManagerProps) => {
       } catch (error) {
         alert('Error al actualizar el icono');
       }
+    }
+  };
+
+  const handleMigrateCategories = async () => {
+    if (!user?.uid) return;
+
+    setIsMigrating(true);
+    setMigrationMessage('Migrando categorías...');
+
+    const DEFAULT_COLORS = [
+      { from: '#0288d1', to: '#01579b' },
+      { from: '#8b5cf6', to: '#6d28d9' },
+      { from: '#14b8a6', to: '#0d9488' },
+      { from: '#f59e0b', to: '#dc2626' },
+      { from: '#10b981', to: '#059669' },
+    ];
+
+    try {
+      const categoriesQuery = query(
+        collection(db, 'categories'),
+        where('userId', '==', user.uid)
+      );
+
+      const snapshot = await getDocs(categoriesQuery);
+      let updated = 0;
+      let skipped = 0;
+
+      for (let i = 0; i < snapshot.docs.length; i++) {
+        const categoryDoc = snapshot.docs[i];
+        const data = categoryDoc.data();
+
+        const needsColors = !data.colorFrom || !data.colorTo;
+        const needsUserId = !data.userId;
+
+        // Si ya tiene todo, saltarla
+        if (!needsColors && !needsUserId) {
+          skipped++;
+          continue;
+        }
+
+        // Preparar actualización
+        const updateData: any = {};
+
+        // Agregar userId si no existe
+        if (needsUserId) {
+          updateData.userId = user.uid;
+        }
+
+        // Asignar colores por defecto si no existen
+        if (needsColors) {
+          const colors = DEFAULT_COLORS[i % DEFAULT_COLORS.length];
+          updateData.colorFrom = colors.from;
+          updateData.colorTo = colors.to;
+        }
+
+        // Actualizar la categoría
+        const categoryRef = doc(db, 'categories', categoryDoc.id);
+        await updateDoc(categoryRef, updateData);
+
+        updated++;
+      }
+
+      setMigrationMessage(`✅ Migración completada: ${updated} categorías actualizadas, ${skipped} ya tenían colores`);
+
+      // Limpiar mensaje después de 5 segundos
+      setTimeout(() => {
+        setMigrationMessage('');
+      }, 5000);
+    } catch (error) {
+      console.error('Error durante la migración:', error);
+      setMigrationMessage(`❌ Error: ${error instanceof Error ? error.message : 'Error desconocido'}`);
+    } finally {
+      setIsMigrating(false);
     }
   };
 
@@ -260,8 +338,23 @@ export const CategoryManager = ({ open, onClose }: CategoryManagerProps) => {
             No tienes categorías. Agrega una para comenzar.
           </Typography>
         )}
+
+        {migrationMessage && (
+          <Alert severity={migrationMessage.includes('✅') ? 'success' : migrationMessage.includes('❌') ? 'error' : 'info'} sx={{ mt: 2 }}>
+            {migrationMessage}
+          </Alert>
+        )}
       </DialogContent>
       <DialogActions>
+        <Button
+          startIcon={<BuildIcon />}
+          onClick={handleMigrateCategories}
+          disabled={isMigrating}
+          color="warning"
+        >
+          {isMigrating ? 'Migrando...' : 'Migrar Categorías'}
+        </Button>
+        <Box sx={{ flexGrow: 1 }} />
         <Button onClick={onClose}>Cerrar</Button>
       </DialogActions>
 
