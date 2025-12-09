@@ -125,6 +125,7 @@ export const useCategories = (userId: string | undefined) => {
     try {
       const categoryRef = doc(db, 'categories', categoryId);
       await updateDoc(categoryRef, {
+        userId, // Asegurar que userId esté presente
         colorFrom,
         colorTo,
         updatedAt: serverTimestamp(),
@@ -142,6 +143,7 @@ export const useCategories = (userId: string | undefined) => {
     try {
       const categoryRef = doc(db, 'categories', categoryId);
       const updateData: any = {
+        userId, // Asegurar que userId esté presente
         updatedAt: serverTimestamp(),
       };
 
