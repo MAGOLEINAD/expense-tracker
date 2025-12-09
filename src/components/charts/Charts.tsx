@@ -153,7 +153,7 @@ export const Charts = ({ allExpenses, currentYear, currentMonth, categories }: C
   // 1️⃣ Distribución de gastos por categoría (mes actual)
   const categoryDistributionData = useMemo(() => {
     const monthExpenses = allExpenses.filter(
-      exp => exp.month === currentMonth && exp.year === currentYear
+      exp => exp.month === currentMonth && exp.year === currentYear && exp.status !== 'pendiente'
     );
 
     const categoryTotals: Record<string, { ars: number; usd: number; totalARS: number }> = {};
@@ -184,7 +184,7 @@ export const Charts = ({ allExpenses, currentYear, currentMonth, categories }: C
   // 2️⃣ Comparación de categorías (mes actual)
   const categoryComparisonData = useMemo(() => {
     const monthExpenses = allExpenses.filter(
-      exp => exp.month === currentMonth && exp.year === currentYear
+      exp => exp.month === currentMonth && exp.year === currentYear && exp.status !== 'pendiente'
     );
 
     const categoryTotals: Record<string, { ars: number; usd: number; totalARS: number }> = {};
@@ -217,7 +217,7 @@ export const Charts = ({ allExpenses, currentYear, currentMonth, categories }: C
   const monthlyEvolutionData = useMemo(() => {
     return MONTHS.map((month, index) => {
       const monthExpenses = allExpenses.filter(
-        exp => exp.month === index + 1 && exp.year === currentYear
+        exp => exp.month === index + 1 && exp.year === currentYear && exp.status !== 'pendiente'
       );
 
       const total = monthExpenses.reduce((sum, exp) => sum + expenseToARS(exp), 0);
@@ -233,7 +233,7 @@ export const Charts = ({ allExpenses, currentYear, currentMonth, categories }: C
   const categoryEvolutionData = useMemo(() => {
     return MONTHS.map((month, index) => {
       const monthExpenses = allExpenses.filter(
-        exp => exp.month === index + 1 && exp.year === currentYear
+        exp => exp.month === index + 1 && exp.year === currentYear && exp.status !== 'pendiente'
       );
 
       const categoryTotals: Record<string, number> = {};
@@ -271,14 +271,14 @@ export const Charts = ({ allExpenses, currentYear, currentMonth, categories }: C
   const myInflationData = useMemo(() => {
     // Inflación mensual: comparar mes actual vs mes anterior
     const currentMonthExpenses = allExpenses.filter(
-      exp => exp.month === currentMonth && exp.year === currentYear
+      exp => exp.month === currentMonth && exp.year === currentYear && exp.status !== 'pendiente'
     );
     const currentMonthTotal = currentMonthExpenses.reduce((sum, exp) => sum + expenseToARS(exp), 0);
 
     const previousMonth = currentMonth === 1 ? 12 : currentMonth - 1;
     const previousMonthYear = currentMonth === 1 ? currentYear - 1 : currentYear;
     const previousMonthExpenses = allExpenses.filter(
-      exp => exp.month === previousMonth && exp.year === previousMonthYear
+      exp => exp.month === previousMonth && exp.year === previousMonthYear && exp.status !== 'pendiente'
     );
     const previousMonthTotal = previousMonthExpenses.reduce((sum, exp) => sum + expenseToARS(exp), 0);
 
@@ -287,10 +287,10 @@ export const Charts = ({ allExpenses, currentYear, currentMonth, categories }: C
       : 0;
 
     // Inflación anual: comparar año actual vs año anterior
-    const currentYearExpenses = allExpenses.filter(exp => exp.year === currentYear);
+    const currentYearExpenses = allExpenses.filter(exp => exp.year === currentYear && exp.status !== 'pendiente');
     const currentYearTotal = currentYearExpenses.reduce((sum, exp) => sum + expenseToARS(exp), 0);
 
-    const previousYearExpenses = allExpenses.filter(exp => exp.year === currentYear - 1);
+    const previousYearExpenses = allExpenses.filter(exp => exp.year === currentYear - 1 && exp.status !== 'pendiente');
     const previousYearTotal = previousYearExpenses.reduce((sum, exp) => sum + expenseToARS(exp), 0);
 
     const annualInflation = previousYearTotal > 0
