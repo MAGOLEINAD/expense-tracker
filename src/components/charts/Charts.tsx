@@ -275,7 +275,12 @@ export const Charts = ({ allExpenses, currentYear, currentMonth, categories }: C
   // Cálculos de resumen
   const yearToDateTotal = monthlyEvolutionData.reduce((sum, data) => sum + data.total, 0);
   const averageMonthly = yearToDateTotal / 12;
-  const currentMonthTotal = categoryDistributionData.reduce((sum, item) => sum + item.value, 0);
+  const currentMonthTotal = useMemo(() => {
+    const monthExpenses = allExpenses.filter(
+      exp => exp.month === currentMonth && exp.year === currentYear && exp.status !== 'pendiente' && exp.status !== 'sin cargo' && includedCategoryIds.has(exp.category)
+    );
+    return monthExpenses.reduce((sum, exp) => sum + expenseToARS(exp), 0);
+  }, [allExpenses, currentMonth, currentYear, includedCategoryIds, usdRate]);
 
   // Calcular inflación basada en datos propios
   const myInflationData = useMemo(() => {
