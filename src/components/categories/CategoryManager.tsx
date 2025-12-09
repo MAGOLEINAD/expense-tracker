@@ -18,13 +18,10 @@ import {
 } from '@mui/material';
 import { Edit as EditIcon, Delete as DeleteIcon, Add as AddIcon } from '@mui/icons-material';
 import SearchIcon from '@mui/icons-material/Search';
-import BuildIcon from '@mui/icons-material/Build';
 import { useAuth } from '@/contexts/AuthContext';
 import { useCategories } from '@/hooks/useCategories';
 import { IconSelector } from '@/components/expenses/IconSelector';
 import * as MuiIcons from '@mui/icons-material';
-import { collection, getDocs, doc, updateDoc, query, where } from 'firebase/firestore';
-import { db } from '@/lib/firebase';
 
 interface CategoryManagerProps {
   open: boolean;
@@ -46,8 +43,6 @@ export const CategoryManager = ({ open, onClose }: CategoryManagerProps) => {
   const [expenseCount, setExpenseCount] = useState(0);
   const [iconSelectorOpen, setIconSelectorOpen] = useState(false);
   const [editingIconCategoryId, setEditingIconCategoryId] = useState<string | null>(null);
-  const [isMigrating, setIsMigrating] = useState(false);
-  const [migrationMessage, setMigrationMessage] = useState<string>('');
 
   const handleStartEdit = (id: string, currentName: string) => {
     setEditingId(id);
@@ -139,91 +134,7 @@ export const CategoryManager = ({ open, onClose }: CategoryManagerProps) => {
     }
   };
 
-  const handleMigrateCategories = async () => {
-    if (!user?.uid) return;
-
-    setIsMigrating(true);
-    setMigrationMessage('Migrando categorías...');
-
-    const DEFAULT_COLORS = [
-      { from: '#0288d1', to: '#01579b' },
-      { from: '#8b5cf6', to: '#6d28d9' },
-      { from: '#14b8a6', to: '#0d9488' },
-      { from: '#f59e0b', to: '#dc2626' },
-      { from: '#10b981', to: '#059669' },
-    ];
-
-    try {
-      console.log('🔍 Usuario actual:', user.uid, user.email);
-
-      const categoriesQuery = query(
-        collection(db, 'categories'),
-        where('userId', '==', user.uid)
-      );
-
-      const snapshot = await getDocs(categoriesQuery);
-      let updated = 0;
-      let skipped = 0;
-      let fixedUserId = 0;
-
-      console.log(`📊 Encontradas ${snapshot.docs.length} categorías`);
-
-      for (let i = 0; i < snapshot.docs.length; i++) {
-        const categoryDoc = snapshot.docs[i];
-        const data = categoryDoc.data();
-
-        console.log(`Categoría "${data.name}":`, {
-          id: categoryDoc.id,
-          userId: data.userId,
-          hasColors: !!(data.colorFrom && data.colorTo),
-        });
-
-        const needsColors = !data.colorFrom || !data.colorTo;
-        const wrongUserId = data.userId && data.userId !== user.uid;
-
-        // Si ya tiene todo correctamente, saltarla
-        if (!needsColors && !wrongUserId) {
-          skipped++;
-          continue;
-        }
-
-        // Preparar actualización
-        const updateData: any = {
-          userId: user.uid, // SIEMPRE corregir el userId
-        };
-
-        if (wrongUserId) {
-          fixedUserId++;
-          console.log(`⚠️ Corrigiendo userId de "${data.userId}" a "${user.uid}"`);
-        }
-
-        // Asignar colores por defecto si no existen
-        if (needsColors) {
-          const colors = DEFAULT_COLORS[i % DEFAULT_COLORS.length];
-          updateData.colorFrom = colors.from;
-          updateData.colorTo = colors.to;
-        }
-
-        // Actualizar la categoría
-        const categoryRef = doc(db, 'categories', categoryDoc.id);
-        await updateDoc(categoryRef, updateData);
-
-        updated++;
-      }
-
-      setMigrationMessage(`✅ Migración completada: ${updated} actualizadas (${fixedUserId} con userId corregido), ${skipped} ya estaban bien`);
-
-      // Limpiar mensaje después de 8 segundos
-      setTimeout(() => {
-        setMigrationMessage('');
-      }, 8000);
-    } catch (error) {
-      console.error('Error durante la migración:', error);
-      setMigrationMessage(`❌ Error: ${error instanceof Error ? error.message : 'Error desconocido'}`);
-    } finally {
-      setIsMigrating(false);
-    }
-  };
+  
 
   if (loading) {
     return (
@@ -352,11 +263,7 @@ export const CategoryManager = ({ open, onClose }: CategoryManagerProps) => {
           </Typography>
         )}
 
-        {migrationMessage && (
-          <Alert severity={migrationMessage.includes('✅') ? 'success' : migrationMessage.includes('❌') ? 'error' : 'info'} sx={{ mt: 2 }}>
-            {migrationMessage}
-          </Alert>
-        )}
+   
       </DialogContent>
       <DialogActions>
       
