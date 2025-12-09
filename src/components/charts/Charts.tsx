@@ -150,10 +150,20 @@ export const Charts = ({ allExpenses, currentYear, currentMonth, categories }: C
     return Array.from(categoriesInUse);
   }, [allExpenses, currentYear]);
 
+  // Filtrar categorías incluidas en totales
+  const includedCategoryIds = useMemo(() => {
+    return new Set(
+      categories
+        .filter(cat => cat.includeInTotals ?? true)
+        .map(cat => cat.id)
+        .filter((id): id is string => id !== undefined)
+    );
+  }, [categories]);
+
   // 1️⃣ Distribución de gastos por categoría (mes actual)
   const categoryDistributionData = useMemo(() => {
     const monthExpenses = allExpenses.filter(
-      exp => exp.month === currentMonth && exp.year === currentYear && exp.status !== 'pendiente'
+      exp => exp.month === currentMonth && exp.year === currentYear && exp.status !== 'pendiente' && exp.status !== 'sin cargo'
     );
 
     const categoryTotals: Record<string, { ars: number; usd: number; totalARS: number }> = {};
@@ -184,7 +194,7 @@ export const Charts = ({ allExpenses, currentYear, currentMonth, categories }: C
   // 2️⃣ Comparación de categorías (mes actual)
   const categoryComparisonData = useMemo(() => {
     const monthExpenses = allExpenses.filter(
-      exp => exp.month === currentMonth && exp.year === currentYear && exp.status !== 'pendiente'
+      exp => exp.month === currentMonth && exp.year === currentYear && exp.status !== 'pendiente' && exp.status !== 'sin cargo'
     );
 
     const categoryTotals: Record<string, { ars: number; usd: number; totalARS: number }> = {};
@@ -217,7 +227,7 @@ export const Charts = ({ allExpenses, currentYear, currentMonth, categories }: C
   const monthlyEvolutionData = useMemo(() => {
     return MONTHS.map((month, index) => {
       const monthExpenses = allExpenses.filter(
-        exp => exp.month === index + 1 && exp.year === currentYear && exp.status !== 'pendiente'
+        exp => exp.month === index + 1 && exp.year === currentYear && exp.status !== 'pendiente' && exp.status !== 'sin cargo' && includedCategoryIds.has(exp.category)
       );
 
       const total = monthExpenses.reduce((sum, exp) => sum + expenseToARS(exp), 0);
@@ -227,13 +237,13 @@ export const Charts = ({ allExpenses, currentYear, currentMonth, categories }: C
         total,
       };
     });
-  }, [allExpenses, currentYear, isMobile, usdRate]);
+  }, [allExpenses, currentYear, isMobile, usdRate, includedCategoryIds]);
 
   // 4️⃣ Evolución por categoría en el tiempo
   const categoryEvolutionData = useMemo(() => {
     return MONTHS.map((month, index) => {
       const monthExpenses = allExpenses.filter(
-        exp => exp.month === index + 1 && exp.year === currentYear && exp.status !== 'pendiente'
+        exp => exp.month === index + 1 && exp.year === currentYear && exp.status !== 'pendiente' && exp.status !== 'sin cargo'
       );
 
       const categoryTotals: Record<string, number> = {};
@@ -271,14 +281,14 @@ export const Charts = ({ allExpenses, currentYear, currentMonth, categories }: C
   const myInflationData = useMemo(() => {
     // Inflación mensual: comparar mes actual vs mes anterior
     const currentMonthExpenses = allExpenses.filter(
-      exp => exp.month === currentMonth && exp.year === currentYear && exp.status !== 'pendiente'
+      exp => exp.month === currentMonth && exp.year === currentYear && exp.status !== 'pendiente' && exp.status !== 'sin cargo' && includedCategoryIds.has(exp.category)
     );
     const currentMonthTotal = currentMonthExpenses.reduce((sum, exp) => sum + expenseToARS(exp), 0);
 
     const previousMonth = currentMonth === 1 ? 12 : currentMonth - 1;
     const previousMonthYear = currentMonth === 1 ? currentYear - 1 : currentYear;
     const previousMonthExpenses = allExpenses.filter(
-      exp => exp.month === previousMonth && exp.year === previousMonthYear && exp.status !== 'pendiente'
+      exp => exp.month === previousMonth && exp.year === previousMonthYear && exp.status !== 'pendiente' && exp.status !== 'sin cargo' && includedCategoryIds.has(exp.category)
     );
     const previousMonthTotal = previousMonthExpenses.reduce((sum, exp) => sum + expenseToARS(exp), 0);
 
@@ -287,10 +297,10 @@ export const Charts = ({ allExpenses, currentYear, currentMonth, categories }: C
       : 0;
 
     // Inflación anual: comparar año actual vs año anterior
-    const currentYearExpenses = allExpenses.filter(exp => exp.year === currentYear && exp.status !== 'pendiente');
+    const currentYearExpenses = allExpenses.filter(exp => exp.year === currentYear && exp.status !== 'pendiente' && exp.status !== 'sin cargo' && includedCategoryIds.has(exp.category));
     const currentYearTotal = currentYearExpenses.reduce((sum, exp) => sum + expenseToARS(exp), 0);
 
-    const previousYearExpenses = allExpenses.filter(exp => exp.year === currentYear - 1 && exp.status !== 'pendiente');
+    const previousYearExpenses = allExpenses.filter(exp => exp.year === currentYear - 1 && exp.status !== 'pendiente' && exp.status !== 'sin cargo' && includedCategoryIds.has(exp.category));
     const previousYearTotal = previousYearExpenses.reduce((sum, exp) => sum + expenseToARS(exp), 0);
 
     const annualInflation = previousYearTotal > 0
@@ -301,7 +311,17 @@ export const Charts = ({ allExpenses, currentYear, currentMonth, categories }: C
       monthly: monthlyInflation,
       annual: annualInflation,
     };
-  }, [allExpenses, currentMonth, currentYear, usdRate]);
+  }, [allExpenses, currentMonth, currentYear, usdRate, includedCategoryIds]);
+
+  // Calcular totales de gastos excluidos (Gastos ajenos)
+  const excludedTotals = useMemo(() => {
+    const currentMonthExpenses = allExpenses.filter(
+      exp => exp.month === currentMonth && exp.year === currentYear && exp.status !== 'pendiente' && exp.status !== 'sin cargo' && !includedCategoryIds.has(exp.category)
+    );
+    const total = currentMonthExpenses.reduce((sum, exp) => sum + expenseToARS(exp), 0);
+
+    return { total };
+  }, [allExpenses, currentMonth, currentYear, usdRate, includedCategoryIds]);
 
   return (
     <Box>
@@ -400,6 +420,21 @@ export const Charts = ({ allExpenses, currentYear, currentMonth, categories }: C
             </Box>
           )}
         </Paper>
+        {excludedTotals.total > 0 && (
+          <Paper elevation={1} sx={{ p: 1.5, borderRadius: 1, bgcolor: '#fef3c7', border: '1px solid #fde68a', flex: 1 }}>
+            <Typography variant="caption" sx={{ color: '#92400e', fontSize: '0.7rem', display: 'block' }}>
+              Gastos ajenos
+            </Typography>
+            <Box sx={{ display: 'flex', gap: 0.5, alignItems: 'center', mt: 0.25, flexWrap: 'wrap' }}>
+              <Typography variant="h6" sx={{ fontWeight: 700, color: '#78350f' }}>
+                ${(excludedTotals.total / 1000).toFixed(0)}k
+              </Typography>
+              <Typography variant="caption" sx={{ color: '#92400e', fontSize: '0.7rem' }}>
+                (mes)
+              </Typography>
+            </Box>
+          </Paper>
+        )}
       </Stack>
 
       <Stack spacing={2}>

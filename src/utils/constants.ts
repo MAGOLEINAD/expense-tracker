@@ -6,6 +6,7 @@ export const PAYMENT_STATUSES: readonly PaymentStatus[] = [
   'bonificado',
   'pendiente',
   'pago anual',
+  'sin cargo',
 ] as const;
 
 // Etiquetas legibles para estados
@@ -14,6 +15,7 @@ export const PAYMENT_STATUS_LABELS: Record<PaymentStatus, string> = {
   bonificado: 'Bonificado',
   pendiente: 'Pendiente',
   'pago anual': 'Pago Anual',
+  'sin cargo': 'Sin Cargo',
 };
 
 // Monedas disponibles
@@ -47,4 +49,5 @@ export const STATUS_COLORS: Record<PaymentStatus, string> = {
   bonificado: '#2196f3',
   pendiente: '#ff9800',
   'pago anual': '#7c3aed',
+  'sin cargo': '#6b7280',
 };

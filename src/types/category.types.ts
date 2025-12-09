@@ -6,6 +6,7 @@ export interface UserCategory {
   colorFrom?: string;
   colorTo?: string;
   icon?: string; // Nombre del icono de Material UI (siempre blanco)
+  includeInTotals?: boolean; // Si se incluye en totales generales (por defecto true)
   createdAt: Date;
   updatedAt: Date;
 }

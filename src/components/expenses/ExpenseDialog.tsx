@@ -68,6 +68,7 @@ export const ExpenseDialog = ({
   });
 
   const [iconSelectorOpen, setIconSelectorOpen] = useState(false);
+  const [importeText, setImporteText] = useState('0');
 
   useEffect(() => {
     if (expense) {
@@ -78,6 +79,7 @@ export const ExpenseDialog = ({
         vto: expense.vto && expense.vto !== '' ? expense.vto : today,
         fechaPago: expense.fechaPago && expense.fechaPago !== '' ? expense.fechaPago : today,
       });
+      setImporteText(String(expense.importe || 0).replace('.', ','));
     } else {
       const newDefaultCategory = categories.length > 0 ? categories[0].id! : '';
       setFormData({
@@ -92,6 +94,7 @@ export const ExpenseDialog = ({
         month: selectedMonth,
         year: selectedYear,
       });
+      setImporteText('0');
     }
   }, [expense, selectedMonth, selectedYear, categories]);
 
@@ -225,11 +228,24 @@ export const ExpenseDialog = ({
           <Box sx={{ display: 'flex', gap: 2 }}>
             <TextField
               fullWidth
-              type="number"
               label="Importe"
-              value={formData.importe}
-              onChange={(e) => setFormData({ ...formData, importe: Number(e.target.value) })}
-              inputProps={{ step: '0.01' }}
+              value={importeText}
+              onChange={(e) => {
+                let value = e.target.value;
+                // Reemplazar puntos por comas
+                value = value.replace(/\./g, ',');
+                // Solo permitir números, una coma y opcionalmente signo negativo
+                if (value === '' || value === '-' || /^-?\d*,?\d*$/.test(value)) {
+                  setImporteText(value);
+                  // Convertir a número para guardar en formData
+                  const numValue = value.replace(',', '.');
+                  const num = numValue === '' || numValue === '-' ? 0 : parseFloat(numValue);
+                  if (!isNaN(num)) {
+                    setFormData({ ...formData, importe: num });
+                  }
+                }
+              }}
+              inputProps={{ inputMode: 'decimal' }}
               sx={{ flex: 2 }}
             />
             <TextField

@@ -253,6 +253,22 @@ export const useCategories = (userId: string | undefined) => {
     }
   };
 
+  const toggleIncludeInTotals = async (categoryId: string, includeInTotals: boolean) => {
+    if (!userId) return;
+
+    try {
+      const categoryRef = doc(db, 'categories', categoryId);
+      await updateDoc(categoryRef, {
+        includeInTotals,
+        updatedAt: serverTimestamp(),
+      });
+    } catch (err) {
+      console.error('Error updating includeInTotals:', err);
+      setError(err instanceof Error ? err.message : 'Error desconocido');
+      throw err;
+    }
+  };
+
   return {
     categories,
     loading,
@@ -264,5 +280,6 @@ export const useCategories = (userId: string | undefined) => {
     deleteCategory,
     findOrphanedExpenses,
     cleanupOrphanedExpenses,
+    toggleIncludeInTotals,
   };
 };

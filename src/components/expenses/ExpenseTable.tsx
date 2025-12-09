@@ -41,6 +41,9 @@ import DeleteSweepIcon from '@mui/icons-material/DeleteSweep';
 import VisibilityIcon from '@mui/icons-material/Visibility';
 import VisibilityOffIcon from '@mui/icons-material/VisibilityOff';
 import MoneyOffIcon from '@mui/icons-material/MoneyOff';
+import SortIcon from '@mui/icons-material/Sort';
+import CheckCircleIcon from '@mui/icons-material/CheckCircle';
+import CancelIcon from '@mui/icons-material/Cancel';
 import type { Expense, Category, PaymentStatus, UserCategory } from '@/types';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -63,7 +66,17 @@ interface ExpenseTableProps {
   selectedYear: number;
 }
 
-const STATUS_OPTIONS: PaymentStatus[] = ['pendiente', 'pagado', 'bonificado', 'pago anual'];
+const STATUS_OPTIONS: PaymentStatus[] = ['pendiente', 'pagado', 'bonificado', 'pago anual', 'sin cargo'];
+
+type SortType = 'manual' | 'alfabetico' | 'estado' | 'importe' | 'vencimiento';
+
+const SORT_OPTIONS: { value: SortType; label: string }[] = [
+  { value: 'manual', label: 'Manual (Arrastrar)' },
+  { value: 'alfabetico', label: 'Alfabético' },
+  { value: 'estado', label: 'Estado (Pendientes primero)' },
+  { value: 'importe', label: 'Importe (Mayor a menor)' },
+  { value: 'vencimiento', label: 'Vencimiento (Más cercano)' },
+];
 
 const getStatusColor = (status: PaymentStatus) => {
   switch (status) {
@@ -85,6 +98,11 @@ const getStatusColor = (status: PaymentStatus) => {
     case 'pago anual':
       return {
         bgcolor: '#7c3aed',
+        color: 'white',
+      };
+    case 'sin cargo':
+      return {
+        bgcolor: '#6b7280',
         color: 'white',
       };
     default:
@@ -137,7 +155,7 @@ const getCategoryColor = (category: UserCategory | undefined, categoryIndex: num
 
 export const ExpenseTable = ({ expenses, categories, onEdit, onUpdate, onDelete, onDeleteMultiple, onAdd, selectedMonth, selectedYear }: ExpenseTableProps) => {
   const { user } = useAuth();
-  const { updateCategoryColors } = useCategories(user?.uid);
+  const { updateCategoryColors, toggleIncludeInTotals } = useCategories(user?.uid);
   const { enqueueSnackbar } = useSnackbar();
   const [usdRate, setUsdRate] = useState<number>(1200);
   const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set());
@@ -154,6 +172,9 @@ export const ExpenseTable = ({ expenses, categories, onEdit, onUpdate, onDelete,
   const [activeId, setActiveId] = useState<string | null>(null);
   const [statusMenuExpense, setStatusMenuExpense] = useState<Expense | null>(null);
   const [statusMenuPosition, setStatusMenuPosition] = useState<{ top: number; left: number } | null>(null);
+  const [sortType, setSortType] = useState<SortType>('manual');
+  const [sortMenuPosition, setSortMenuPosition] = useState<{ top: number; left: number } | null>(null);
+  const [optimisticIncludeInTotals, setOptimisticIncludeInTotals] = useState<Record<string, boolean>>({});
 
   // Inicializar expandedCategories con todas las categorías
   useEffect(() => {
@@ -424,14 +445,96 @@ export const ExpenseTable = ({ expenses, categories, onEdit, onUpdate, onDelete,
     onAdd(newExpense);
   };
 
+  // Helper para obtener el valor de includeInTotals (optimistic o real)
+  const getIncludeInTotals = (categoryId: string, category: UserCategory | undefined): boolean => {
+    if (categoryId in optimisticIncludeInTotals) {
+      return optimisticIncludeInTotals[categoryId];
+    }
+    return category?.includeInTotals ?? true;
+  };
+
+  const handleToggleIncludeInTotals = async (categoryId: string, currentValue: boolean) => {
+    const newValue = !currentValue;
+
+    // Optimistic update
+    setOptimisticIncludeInTotals(prev => ({ ...prev, [categoryId]: newValue }));
+
+    try {
+      if (toggleIncludeInTotals) {
+        await toggleIncludeInTotals(categoryId, newValue);
+      }
+    } catch (error) {
+      // Revertir en caso de error
+      setOptimisticIncludeInTotals(prev => {
+        const newState = { ...prev };
+        delete newState[categoryId];
+        return newState;
+      });
+      enqueueSnackbar('Error al actualizar la categoría', { variant: 'error' });
+    } finally {
+      // Limpiar el estado optimistic después de que Firebase actualice
+      setTimeout(() => {
+        setOptimisticIncludeInTotals(prev => {
+          const newState = { ...prev };
+          delete newState[categoryId];
+          return newState;
+        });
+      }, 500);
+    }
+  };
+
+  // Función para ordenar gastos según el criterio seleccionado
+  const sortExpenses = (expenses: Expense[], sortType: SortType): Expense[] => {
+    const sorted = [...expenses];
+
+    switch (sortType) {
+      case 'alfabetico':
+        return sorted.sort((a, b) => a.item.localeCompare(b.item));
+
+      case 'estado':
+        // Orden: pendiente, pago anual, pagado, bonificado, sin cargo
+        const statusOrder: Record<PaymentStatus, number> = {
+          'pendiente': 0,
+          'pago anual': 1,
+          'pagado': 2,
+          'bonificado': 3,
+          'sin cargo': 4,
+        };
+        return sorted.sort((a, b) => statusOrder[a.status] - statusOrder[b.status]);
+
+      case 'importe':
+        return sorted.sort((a, b) => b.importe - a.importe); // Mayor a menor
+
+      case 'vencimiento':
+        return sorted.sort((a, b) => {
+          // Manejar casos especiales (vacío, guión, "Bonificado", etc.)
+          const aVto = a.vto && a.vto !== '-' && a.vto !== 'Bonificado' && a.vto !== '' ? a.vto : null;
+          const bVto = b.vto && b.vto !== '-' && b.vto !== 'Bonificado' && b.vto !== '' ? b.vto : null;
+
+          // Los que no tienen fecha van al final
+          if (!aVto && !bVto) return 0;
+          if (!aVto) return 1;
+          if (!bVto) return -1;
+
+          // Comparar fechas (formato YYYY-MM-DD)
+          return aVto.localeCompare(bVto);
+        });
+
+      case 'manual':
+      default:
+        return sorted.sort((a, b) => (a.order || 0) - (b.order || 0));
+    }
+  };
+
   // Obtener solo las categorías que tienen gastos
   const categoryTotals = categories.map((userCategory, index) => {
-    const categoryExpenses = expenses
-      .filter(exp => exp.category === userCategory.id)
-      .sort((a, b) => (a.order || 0) - (b.order || 0)); // Sort by order
+    const categoryExpenses = sortExpenses(
+      expenses.filter(exp => exp.category === userCategory.id),
+      sortType
+    );
 
-    // Filtrar solo gastos que NO están pendientes para los totales
-    const paidExpenses = categoryExpenses.filter(exp => exp.status !== 'pendiente');
+    // Filtrar solo gastos que NO están pendientes ni sin cargo para los totales
+    const paidExpenses = categoryExpenses.filter(exp => exp.status !== 'pendiente' && exp.status !== 'sin cargo');
 
     const totalARS = paidExpenses
       .filter(exp => exp.currency === 'ARS')
@@ -451,9 +554,25 @@ export const ExpenseTable = ({ expenses, categories, onEdit, onUpdate, onDelete,
     };
   }).filter(cat => cat.expenses.length > 0); // Solo mostrar categorías con gastos
 
-  const grandTotalARS = categoryTotals.reduce((sum, cat) => sum + cat.totalARS, 0);
-  const grandTotalUSD = categoryTotals.reduce((sum, cat) => sum + cat.totalUSD, 0);
+  // Filtrar categorías que se incluyen en totales
+  const includedCategories = categoryTotals.filter(cat => {
+    const category = categories.find(c => c.id === cat.categoryId);
+    return getIncludeInTotals(cat.categoryId, category);
+  });
+
+  const excludedCategories = categoryTotals.filter(cat => {
+    const category = categories.find(c => c.id === cat.categoryId);
+    return !getIncludeInTotals(cat.categoryId, category);
+  });
+
+  const grandTotalARS = includedCategories.reduce((sum, cat) => sum + cat.totalARS, 0);
+  const grandTotalUSD = includedCategories.reduce((sum, cat) => sum + cat.totalUSD, 0);
   const grandTotalInARS = grandTotalARS + (grandTotalUSD * usdRate);
+
+  // Calcular totales de gastos excluidos
+  const excludedTotalARS = excludedCategories.reduce((sum, cat) => sum + cat.totalARS, 0);
+  const excludedTotalUSD = excludedCategories.reduce((sum, cat) => sum + cat.totalUSD, 0);
+  const excludedTotalInARS = excludedTotalARS + (excludedTotalUSD * usdRate);
 
   // Calcular total de deudas
   const totalDebt = expenses.reduce((sum, exp) => sum + (exp.debt || 0), 0);
@@ -639,29 +758,55 @@ export const ExpenseTable = ({ expenses, categories, onEdit, onUpdate, onDelete,
                   <MuiIcons.Add fontSize="small" />
                 </IconButton>
               </Tooltip>
-              <IconButton
-                size="small"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setEditingColor(categoryId);
-                  // Inicializar colores temporales
-                  setTempColorFrom(category?.colorFrom || colors.from);
-                  setTempColorTo(category?.colorTo || colors.to);
-                }}
-                sx={{ color: 'white', p: 0.5 }}
-              >
-                <PaletteIcon fontSize="small" />
-              </IconButton>
-              <IconButton
-                size="small"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setDeleteCategoryDialog(categoryId);
-                }}
-                sx={{ color: 'white', p: 0.5 }}
-              >
-                <DeleteSweepIcon fontSize="small" />
-              </IconButton>
+              <Tooltip title="Ordenar gastos" arrow>
+                <IconButton
+                  size="small"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    const rect = e.currentTarget.getBoundingClientRect();
+                    setSortMenuPosition({
+                      top: rect.bottom,
+                      left: rect.left,
+                    });
+                  }}
+                  sx={{
+                    color: 'white',
+                    p: 0.5,
+                    '&:hover': {
+                      bgcolor: 'rgba(255, 255, 255, 0.2)',
+                    }
+                  }}
+                >
+                  <SortIcon fontSize="small" />
+                </IconButton>
+              </Tooltip>
+              <Tooltip title="Cambiar colores" arrow>
+                <IconButton
+                  size="small"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setEditingColor(categoryId);
+                    // Inicializar colores temporales
+                    setTempColorFrom(category?.colorFrom || colors.from);
+                    setTempColorTo(category?.colorTo || colors.to);
+                  }}
+                  sx={{ color: 'white', p: 0.5 }}
+                >
+                  <PaletteIcon fontSize="small" />
+                </IconButton>
+              </Tooltip>
+              <Tooltip title="Eliminar todos los gastos" arrow>
+                <IconButton
+                  size="small"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setDeleteCategoryDialog(categoryId);
+                  }}
+                  sx={{ color: 'white', p: 0.5 }}
+                >
+                  <DeleteSweepIcon fontSize="small" />
+                </IconButton>
+              </Tooltip>
             </Box>
 
             {/* Category Content - Collapsible */}
@@ -954,10 +1099,22 @@ export const ExpenseTable = ({ expenses, categories, onEdit, onUpdate, onDelete,
                     </SortableContext>
 
                     {/* Category Subtotal */}
-                    {catExpenses.length > 0 && (
+                    {catExpenses.length > 0 && (() => {
+                      const includeInTotals = getIncludeInTotals(categoryId, category);
+                      return (
                       <TableRow
+                        onClick={() => {
+                          if (category?.id) {
+                            handleToggleIncludeInTotals(category.id, includeInTotals);
+                          }
+                        }}
                         sx={{
                           background: 'linear-gradient(to right, #f1f5f9, #e2e8f0)',
+                          cursor: 'pointer',
+                          transition: 'all 0.2s ease',
+                          '&:hover': {
+                            background: 'linear-gradient(to right, #e2e8f0, #cbd5e1)',
+                          },
                           '& td': {
                             fontWeight: 700,
                             borderTop: '3px solid #cbd5e1',
@@ -967,7 +1124,39 @@ export const ExpenseTable = ({ expenses, categories, onEdit, onUpdate, onDelete,
                         }}
                       >
                         <TableCell colSpan={7} align="right">
-                          <strong>SUBTOTAL:</strong>
+                          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 1 }}>
+                            <Box
+                              sx={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                transition: 'all 0.3s ease',
+                                animation: categoryId in optimisticIncludeInTotals ? 'pulse 0.3s ease-in-out' : 'none',
+                                '@keyframes pulse': {
+                                  '0%, 100%': { transform: 'scale(1)' },
+                                  '50%': { transform: 'scale(1.2)' },
+                                },
+                              }}
+                            >
+                              {includeInTotals ? (
+                                <CheckCircleIcon
+                                  sx={{
+                                    color: '#16a34a',
+                                    fontSize: 20,
+                                    transition: 'all 0.3s ease',
+                                  }}
+                                />
+                              ) : (
+                                <CancelIcon
+                                  sx={{
+                                    color: '#dc2626',
+                                    fontSize: 20,
+                                    transition: 'all 0.3s ease',
+                                  }}
+                                />
+                              )}
+                            </Box>
+                            <strong>SUBTOTAL:</strong>
+                          </Box>
                         </TableCell>
                         <TableCell colSpan={2} align="right">
                           <Box>
@@ -989,7 +1178,8 @@ export const ExpenseTable = ({ expenses, categories, onEdit, onUpdate, onDelete,
                           </Box>
                         </TableCell>
                       </TableRow>
-                    )}
+                      );
+                    })()}
                   </TableBody>
                 </Table>
               </TableContainer>
@@ -1062,6 +1252,20 @@ export const ExpenseTable = ({ expenses, categories, onEdit, onUpdate, onDelete,
                   </Typography>
                   <Typography variant="h6" fontWeight="bold" sx={{ color: '#ef4444', fontSize: '1.25rem', lineHeight: 1.2 }}>
                     $ {totalDebt.toLocaleString('es-AR', { maximumFractionDigits: 0 })}
+                  </Typography>
+                </Box>
+              )}
+              {excludedTotalInARS > 0 && (
+                <Box sx={{
+                  textAlign: 'right',
+                  pl: 2,
+                  borderLeft: '1px solid rgba(255, 255, 255, 0.3)'
+                }}>
+                  <Typography variant="caption" sx={{ opacity: 0.85, fontSize: '0.65rem', display: 'block', color: '#fbbf24' }}>
+                    Gastos ajenos
+                  </Typography>
+                  <Typography variant="h6" fontWeight="bold" sx={{ color: '#f59e0b', fontSize: '1.25rem', lineHeight: 1.2 }}>
+                    $ {excludedTotalInARS.toLocaleString('es-AR', { maximumFractionDigits: 0 })}
                   </Typography>
                 </Box>
               )}
@@ -1288,7 +1492,48 @@ export const ExpenseTable = ({ expenses, categories, onEdit, onUpdate, onDelete,
               }}
             />
             <Typography variant="body2">
-              {status === 'pago anual' ? 'Pago Anual' : status.charAt(0).toUpperCase() + status.slice(1)}
+              {status === 'pago anual' ? 'Pago Anual' : status === 'sin cargo' ? 'Sin Cargo' : status.charAt(0).toUpperCase() + status.slice(1)}
+            </Typography>
+          </MenuItem>
+        ))}
+      </Menu>
+
+      {/* Sort Menu */}
+      <Menu
+        open={Boolean(sortMenuPosition)}
+        onClose={() => setSortMenuPosition(null)}
+        anchorReference="anchorPosition"
+        anchorPosition={
+          sortMenuPosition
+            ? { top: sortMenuPosition.top, left: sortMenuPosition.left }
+            : undefined
+        }
+        slotProps={{
+          paper: {
+            sx: {
+              mt: 0.5,
+            },
+          },
+        }}
+      >
+        {SORT_OPTIONS.map((option) => (
+          <MenuItem
+            key={option.value}
+            onClick={() => {
+              setSortType(option.value);
+              setSortMenuPosition(null);
+            }}
+            selected={sortType === option.value}
+            sx={{
+              minWidth: 220,
+              display: 'flex',
+              alignItems: 'center',
+              gap: 1,
+            }}
+          >
+            <SortIcon fontSize="small" sx={{ color: sortType === option.value ? 'primary.main' : 'text.secondary' }} />
+            <Typography variant="body2">
+              {option.label}
             </Typography>
           </MenuItem>
         ))}
