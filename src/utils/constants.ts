@@ -49,5 +49,5 @@ export const STATUS_COLORS: Record<PaymentStatus, string> = {
   bonificado: '#2196f3',
   pendiente: '#ff9800',
   'pago anual': '#7c3aed',
-  'sin cargo': '#6b7280',
+  'sin cargo': '#06b6d4',
 };

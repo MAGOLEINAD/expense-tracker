@@ -102,7 +102,7 @@ const getStatusColor = (status: PaymentStatus) => {
       };
     case 'sin cargo':
       return {
-        bgcolor: '#6b7280',
+        bgcolor: '#06b6d4',
         color: 'white',
       };
     default:
@@ -213,11 +213,12 @@ export const ExpenseTable = ({ expenses, categories, onEdit, onUpdate, onDelete,
     let value = expense[field as keyof Expense];
 
     // Para fechas, convertir de AAAA-MM-DD a DD/MM/AAAA
-    if ((field === 'vto' || field === 'fechaPago') && value && value !== 'Bonificado' && value !== '') {
+    // Excluir valores especiales como '-', 'Bonificado', etc.
+    if ((field === 'vto' || field === 'fechaPago') && value && value !== 'Bonificado' && value !== '' && value !== '-' && typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value)) {
       try {
         const dateStr = value as string;
-        if (dateStr.includes('-')) {
-          const [year, month, day] = dateStr.split('-');
+        const [year, month, day] = dateStr.split('-');
+        if (year && month && day) {
           value = `${day}/${month}/${year}`;
         }
       } catch (e) {
@@ -225,7 +226,8 @@ export const ExpenseTable = ({ expenses, categories, onEdit, onUpdate, onDelete,
       }
     }
 
-    setEditValue(String(value || ''));
+    // Evitar que aparezca "undefined" como texto
+    setEditValue(value != null ? String(value) : '');
   };
 
   const handleCellBlur = (expense: Expense, event?: React.FocusEvent) => {
@@ -240,13 +242,18 @@ export const ExpenseTable = ({ expenses, categories, onEdit, onUpdate, onDelete,
 
     // Convertir fecha de DD/MM/AAAA a AAAA-MM-DD si es un campo de fecha
     if (editingCell.field === 'vto' || editingCell.field === 'fechaPago') {
-      if (editValue.includes('/')) {
+      // Solo convertir si el formato es DD/MM/AAAA (con exactamente 10 caracteres)
+      if (editValue.includes('/') && editValue.length === 10) {
         const parts = editValue.split('/');
         if (parts.length === 3) {
           const [day, month, year] = parts;
-          newValue = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+          // Validar que sean números
+          if (!isNaN(Number(day)) && !isNaN(Number(month)) && !isNaN(Number(year))) {
+            newValue = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+          }
         }
       }
+      // Si no es una fecha válida, guardar el texto tal cual
     } else if (editingCell.field === 'importe') {
       newValue = Number(editValue);
     }
@@ -489,7 +496,21 @@ export const ExpenseTable = ({ expenses, categories, onEdit, onUpdate, onDelete,
 
     switch (sortType) {
       case 'alfabetico':
-        return sorted.sort((a, b) => a.item.localeCompare(b.item));
+        return sorted.sort((a, b) => {
+          // Los gastos con item "-" van al final
+          const aIsEmpty = a.item === '-';
+          const bIsEmpty = b.item === '-';
+
+          if (aIsEmpty && !bIsEmpty) return 1;
+          if (!aIsEmpty && bIsEmpty) return -1;
+          if (aIsEmpty && bIsEmpty) {
+            // Si ambos tienen "-", ordenar por order
+            return (a.order || 0) - (b.order || 0);
+          }
+
+          // Ordenamiento alfabético normal
+          return a.item.localeCompare(b.item);
+        });
 
       case 'estado':
         // Orden: pendiente, pago anual, pagado, bonificado, sin cargo
@@ -500,10 +521,27 @@ export const ExpenseTable = ({ expenses, categories, onEdit, onUpdate, onDelete,
           'bonificado': 3,
           'sin cargo': 4,
         };
-        return sorted.sort((a, b) => statusOrder[a.status] - statusOrder[b.status]);
+        return sorted.sort((a, b) => {
+          const statusDiff = statusOrder[a.status] - statusOrder[b.status];
+          // Si tienen el mismo estado, ordenar por order
+          if (statusDiff === 0) {
+            return (a.order || 0) - (b.order || 0);
+          }
+          return statusDiff;
+        });
 
       case 'importe':
-        return sorted.sort((a, b) => b.importe - a.importe); // Mayor a menor
+        return sorted.sort((a, b) => {
+          // Los gastos con importe 0 van al final
+          if (a.importe === 0 && b.importe !== 0) return 1;
+          if (a.importe !== 0 && b.importe === 0) return -1;
+          // Si ambos tienen importe 0, ordenar por order (más nuevos al final)
+          if (a.importe === 0 && b.importe === 0) {
+            return (a.order || 0) - (b.order || 0);
+          }
+          // Si ambos son > 0, ordenar por importe (mayor a menor)
+          return b.importe - a.importe;
+        });
 
       case 'vencimiento':
         return sorted.sort((a, b) => {
@@ -512,7 +550,10 @@ export const ExpenseTable = ({ expenses, categories, onEdit, onUpdate, onDelete,
           const bVto = b.vto && b.vto !== '-' && b.vto !== 'Bonificado' && b.vto !== '' ? b.vto : null;
 
           // Los que no tienen fecha van al final
-          if (!aVto && !bVto) return 0;
+          if (!aVto && !bVto) {
+            // Si ambos no tienen fecha, ordenar por order (más nuevos al final)
+            return (a.order || 0) - (b.order || 0);
+          }
           if (!aVto) return 1;
           if (!bVto) return -1;
 
@@ -904,31 +945,35 @@ export const ExpenseTable = ({ expenses, categories, onEdit, onUpdate, onDelete,
                             }}
                           >
                             {editingCell?.id === expense.id && editingCell?.field === 'vto' ? (
-                              <TextField
-                                value={editValue}
-                                onChange={(e) => {
-                                  let value = e.target.value.replace(/[^\d]/g, ''); // Solo números
-
-                                  // Auto-formatear con barras
-                                  if (value.length >= 2) {
-                                    value = value.slice(0, 2) + '/' + value.slice(2);
-                                  }
-                                  if (value.length >= 5) {
-                                    value = value.slice(0, 5) + '/' + value.slice(5, 9);
-                                  }
-
-                                  if (value.length <= 10) {
-                                    setEditValue(value);
-                                  }
-                                }}
-                                onBlur={(e) => handleCellBlur(expense, e)}
-                                onKeyDown={(e) => handleKeyDown(e, expense)}
-                                autoFocus
-                                size="small"
-                                variant="standard"
-                                sx={{ maxWidth: 140 }}
-                                placeholder="DD/MM/AAAA"
-                              />
+                              <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                                <TextField
+                                  value={editValue}
+                                  onChange={(e) => {
+                                    // Permitir escribir cualquier cosa
+                                    setEditValue(e.target.value);
+                                  }}
+                                  onBlur={(e) => handleCellBlur(expense, e)}
+                                  onKeyDown={(e) => handleKeyDown(e, expense)}
+                                  autoFocus
+                                  size="small"
+                                  variant="standard"
+                                  sx={{ maxWidth: 140 }}
+                                  placeholder="DD/MM/AAAA"
+                                />
+                                <Tooltip title="Limpiar">
+                                  <IconButton
+                                    size="small"
+                                    onMouseDown={(e) => {
+                                      e.preventDefault(); // Prevenir que se pierda el foco del TextField
+                                      e.stopPropagation();
+                                      setEditValue('-');
+                                    }}
+                                    sx={{ p: 0.25 }}
+                                  >
+                                    <CancelIcon fontSize="small" sx={{ fontSize: 16 }} />
+                                  </IconButton>
+                                </Tooltip>
+                              </Box>
                             ) : expense.vto && expense.vto !== 'Bonificado' && expense.vto !== '' && expense.vto !== '-' && /^\d{4}-\d{2}-\d{2}$/.test(expense.vto) ? (
                               format(new Date(expense.vto + 'T00:00:00'), 'dd/MM/yyyy', { locale: es })
                             ) : (
@@ -943,31 +988,35 @@ export const ExpenseTable = ({ expenses, categories, onEdit, onUpdate, onDelete,
                             }}
                           >
                             {editingCell?.id === expense.id && editingCell?.field === 'fechaPago' ? (
-                              <TextField
-                                value={editValue}
-                                onChange={(e) => {
-                                  let value = e.target.value.replace(/[^\d]/g, ''); // Solo números
-
-                                  // Auto-formatear con barras
-                                  if (value.length >= 2) {
-                                    value = value.slice(0, 2) + '/' + value.slice(2);
-                                  }
-                                  if (value.length >= 5) {
-                                    value = value.slice(0, 5) + '/' + value.slice(5, 9);
-                                  }
-
-                                  if (value.length <= 10) {
-                                    setEditValue(value);
-                                  }
-                                }}
-                                onBlur={(e) => handleCellBlur(expense, e)}
-                                onKeyDown={(e) => handleKeyDown(e, expense)}
-                                autoFocus
-                                size="small"
-                                variant="standard"
-                                sx={{ maxWidth: 140 }}
-                                placeholder="DD/MM/AAAA"
-                              />
+                              <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                                <TextField
+                                  value={editValue}
+                                  onChange={(e) => {
+                                    // Permitir escribir cualquier cosa
+                                    setEditValue(e.target.value);
+                                  }}
+                                  onBlur={(e) => handleCellBlur(expense, e)}
+                                  onKeyDown={(e) => handleKeyDown(e, expense)}
+                                  autoFocus
+                                  size="small"
+                                  variant="standard"
+                                  sx={{ maxWidth: 140 }}
+                                  placeholder="DD/MM/AAAA"
+                                />
+                                <Tooltip title="Limpiar">
+                                  <IconButton
+                                    size="small"
+                                    onMouseDown={(e) => {
+                                      e.preventDefault(); // Prevenir que se pierda el foco del TextField
+                                      e.stopPropagation();
+                                      setEditValue('-');
+                                    }}
+                                    sx={{ p: 0.25 }}
+                                  >
+                                    <CancelIcon fontSize="small" sx={{ fontSize: 16 }} />
+                                  </IconButton>
+                                </Tooltip>
+                              </Box>
                             ) : expense.fechaPago && expense.fechaPago !== 'Bonificado' && expense.fechaPago !== '' && expense.fechaPago !== '-' && !expense.fechaPago.includes('PAGO') && /^\d{4}-\d{2}-\d{2}$/.test(expense.fechaPago) ? (
                               format(new Date(expense.fechaPago + 'T00:00:00'), 'dd/MM/yyyy', { locale: es })
                             ) : (
