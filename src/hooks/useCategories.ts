@@ -136,6 +136,30 @@ export const useCategories = (userId: string | undefined) => {
     }
   };
 
+  const updateCategoryIcon = async (categoryId: string, icon: string | null) => {
+    if (!userId) return;
+
+    try {
+      const categoryRef = doc(db, 'categories', categoryId);
+      const updateData: any = {
+        updatedAt: serverTimestamp(),
+      };
+
+      if (icon) {
+        updateData.icon = icon;
+      } else {
+        // Si icon es null, eliminamos el campo
+        updateData.icon = null;
+      }
+
+      await updateDoc(categoryRef, updateData);
+    } catch (err) {
+      console.error('Error updating category icon:', err);
+      setError(err instanceof Error ? err.message : 'Error desconocido');
+      throw err;
+    }
+  };
+
   const deleteCategory = async (categoryId: string, cascadeDelete = false) => {
     if (!userId) return;
 
@@ -234,6 +258,7 @@ export const useCategories = (userId: string | undefined) => {
     addCategory,
     updateCategory,
     updateCategoryColors,
+    updateCategoryIcon,
     deleteCategory,
     findOrphanedExpenses,
     cleanupOrphanedExpenses,

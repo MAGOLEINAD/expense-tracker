@@ -56,8 +56,6 @@ export const ExpenseDialog = ({
 
   const [formData, setFormData] = useState<Partial<Expense>>({
     item: '',
-    icon: undefined,
-    iconColor: '#2196f3',
     vto: format(new Date(), 'yyyy-MM-dd'),
     fechaPago: format(new Date(), 'yyyy-MM-dd'),
     importe: 0,
@@ -67,8 +65,6 @@ export const ExpenseDialog = ({
     category: defaultCategory,
     month: selectedMonth,
     year: selectedYear,
-    comment: undefined,
-    debt: undefined,
   });
 
   const [iconSelectorOpen, setIconSelectorOpen] = useState(false);
@@ -86,8 +82,6 @@ export const ExpenseDialog = ({
       const newDefaultCategory = categories.length > 0 ? categories[0].id! : '';
       setFormData({
         item: '',
-        icon: undefined,
-        iconColor: '#2196f3',
         vto: format(new Date(), 'yyyy-MM-dd'),
         fechaPago: format(new Date(), 'yyyy-MM-dd'),
         importe: 0,
@@ -97,8 +91,6 @@ export const ExpenseDialog = ({
         category: newDefaultCategory,
         month: selectedMonth,
         year: selectedYear,
-        comment: undefined,
-        debt: undefined,
       });
     }
   }, [expense, selectedMonth, selectedYear, categories]);
@@ -111,7 +103,17 @@ export const ExpenseDialog = ({
   const SelectedIconComponent = formData.icon ? (MuiIcons as any)[formData.icon] : null;
 
   const handleSubmit = () => {
-    onSave(formData);
+    // Limpiar campos undefined antes de guardar
+    // Firestore no acepta undefined, solo null o omitir el campo
+    const cleanedData: Partial<Expense> = {};
+    Object.keys(formData).forEach((key) => {
+      const value = formData[key as keyof Partial<Expense>];
+      if (value !== undefined) {
+        (cleanedData as any)[key] = value;
+      }
+    });
+
+    onSave(cleanedData);
     onClose();
   };
 

@@ -14,10 +14,14 @@ import {
   Typography,
   CircularProgress,
   Alert,
+  ListItemIcon,
 } from '@mui/material';
 import { Edit as EditIcon, Delete as DeleteIcon, Add as AddIcon } from '@mui/icons-material';
+import SearchIcon from '@mui/icons-material/Search';
 import { useAuth } from '@/contexts/AuthContext';
 import { useCategories } from '@/hooks/useCategories';
+import { IconSelector } from '@/components/expenses/IconSelector';
+import * as MuiIcons from '@mui/icons-material';
 
 interface CategoryManagerProps {
   open: boolean;
@@ -26,7 +30,7 @@ interface CategoryManagerProps {
 
 export const CategoryManager = ({ open, onClose }: CategoryManagerProps) => {
   const { user } = useAuth();
-  const { categories, loading, addCategory, updateCategory, deleteCategory } = useCategories(
+  const { categories, loading, addCategory, updateCategory, deleteCategory, updateCategoryIcon } = useCategories(
     user?.uid
   );
 
@@ -37,6 +41,8 @@ export const CategoryManager = ({ open, onClose }: CategoryManagerProps) => {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [categoryToDelete, setCategoryToDelete] = useState<{ id: string; name: string } | null>(null);
   const [expenseCount, setExpenseCount] = useState(0);
+  const [iconSelectorOpen, setIconSelectorOpen] = useState(false);
+  const [editingIconCategoryId, setEditingIconCategoryId] = useState<string | null>(null);
 
   const handleStartEdit = (id: string, currentName: string) => {
     setEditingId(id);
@@ -111,6 +117,23 @@ export const CategoryManager = ({ open, onClose }: CategoryManagerProps) => {
     }
   };
 
+  const handleOpenIconSelector = (categoryId: string) => {
+    setEditingIconCategoryId(categoryId);
+    setIconSelectorOpen(true);
+  };
+
+  const handleSelectIcon = async (iconName: string) => {
+    if (editingIconCategoryId) {
+      try {
+        await updateCategoryIcon(editingIconCategoryId, iconName);
+        setIconSelectorOpen(false);
+        setEditingIconCategoryId(null);
+      } catch (error) {
+        alert('Error al actualizar el icono');
+      }
+    }
+  };
+
   if (loading) {
     return (
       <Dialog open={open} onClose={onClose}>
@@ -133,15 +156,25 @@ export const CategoryManager = ({ open, onClose }: CategoryManagerProps) => {
               key={category.id}
               secondaryAction={
                 editingId !== category.id && (
-                  <Box>
+                  <Box sx={{ display: 'flex', gap: 0.5 }}>
                     <IconButton
-                      edge="end"
+                      size="small"
+                      onClick={() => handleOpenIconSelector(category.id!)}
+                      title="Seleccionar icono"
+                    >
+                      <SearchIcon fontSize="small" />
+                    </IconButton>
+                    <IconButton
+                      size="small"
                       onClick={() => handleStartEdit(category.id!, category.name)}
                     >
-                      <EditIcon />
+                      <EditIcon fontSize="small" />
                     </IconButton>
-                    <IconButton edge="end" onClick={() => handleDelete(category.id!, category.name)}>
-                      <DeleteIcon />
+                    <IconButton
+                      size="small"
+                      onClick={() => handleDelete(category.id!, category.name)}
+                    >
+                      <DeleteIcon fontSize="small" />
                     </IconButton>
                   </Box>
                 )
@@ -168,7 +201,17 @@ export const CategoryManager = ({ open, onClose }: CategoryManagerProps) => {
                   </Button>
                 </Box>
               ) : (
-                <ListItemText primary={category.name} />
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                  {category.icon && (() => {
+                    const IconComponent = (MuiIcons as any)[category.icon];
+                    return IconComponent ? (
+                      <ListItemIcon sx={{ minWidth: 'auto' }}>
+                        <IconComponent sx={{ color: 'primary.main' }} />
+                      </ListItemIcon>
+                    ) : null;
+                  })()}
+                  <ListItemText primary={category.name} />
+                </Box>
               )}
             </ListItem>
           ))}
@@ -221,6 +264,17 @@ export const CategoryManager = ({ open, onClose }: CategoryManagerProps) => {
       <DialogActions>
         <Button onClick={onClose}>Cerrar</Button>
       </DialogActions>
+
+      {/* Selector de iconos */}
+      <IconSelector
+        open={iconSelectorOpen}
+        selectedIcon={categories.find(c => c.id === editingIconCategoryId)?.icon}
+        onClose={() => {
+          setIconSelectorOpen(false);
+          setEditingIconCategoryId(null);
+        }}
+        onSelect={handleSelectIcon}
+      />
 
       {/* Diálogo de confirmación de borrado en cascada */}
       <Dialog

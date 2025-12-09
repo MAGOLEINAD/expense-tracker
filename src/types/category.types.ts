@@ -5,6 +5,7 @@ export interface UserCategory {
   order: number;
   colorFrom?: string;
   colorTo?: string;
+  icon?: string; // Nombre del icono de Material UI (siempre blanco)
   createdAt: Date;
   updatedAt: Date;
 }

@@ -95,9 +95,18 @@ const getStatusColor = (status: PaymentStatus) => {
   }
 };
 
-const getCategoryIcon = (categoryIndex: number) => {
-  const icons = [<ReceiptIcon />, <CreditCardIcon />, <DirectionsCarIcon />, <PaletteIcon />];
-  return icons[categoryIndex % icons.length];
+const getCategoryIcon = (category: UserCategory | undefined, categoryIndex: number) => {
+  // Si la categoría tiene un icono personalizado, usarlo
+  if (category?.icon) {
+    const IconComponent = (MuiIcons as any)[category.icon];
+    if (IconComponent) {
+      return <IconComponent sx={{ color: 'white' }} />;
+    }
+  }
+
+  // Si no, usar iconos por defecto según índice
+  const defaultIcons = [<ReceiptIcon />, <CreditCardIcon />, <DirectionsCarIcon />, <PaletteIcon />];
+  return defaultIcons[categoryIndex % defaultIcons.length];
 };
 
 const formatCurrency = (amount: number, currency: string) => {
@@ -551,7 +560,10 @@ export const ExpenseTable = ({ expenses, categories, onEdit, onUpdate, onDelete,
         <Stack spacing={1.5}>
         {categoryTotals.map(({ categoryId, categoryName, categoryIndex, expenses: catExpenses, totalARS, totalUSD, totalInARS }) => {
           const category = categories.find(c => c.id === categoryId);
-          const colors = getCategoryColor(category, categoryIndex);
+          // Si estamos editando esta categoría, usar colores temporales
+          const colors = editingColor === categoryId
+            ? { from: tempColorFrom, to: tempColorTo }
+            : getCategoryColor(category, categoryIndex);
           return (
           <DroppableCategory key={categoryId} categoryId={categoryId}>
             <Paper
@@ -585,7 +597,7 @@ export const ExpenseTable = ({ expenses, categories, onEdit, onUpdate, onDelete,
                 }}
               >
                 <Box sx={{ mr: 1.5, display: 'flex', alignItems: 'center', fontSize: '1rem' }}>
-                  {getCategoryIcon(categoryIndex)}
+                  {getCategoryIcon(category, categoryIndex)}
                 </Box>
                 <Typography variant="body2" sx={{ flexGrow: 1, fontWeight: 700, fontSize: '0.875rem' }}>
                   {categoryName}
