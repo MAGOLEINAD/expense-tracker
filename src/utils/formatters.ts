@@ -44,3 +44,68 @@ export const generateYearOptions = (startYear: number = 2020): number[] => {
   }
   return years;
 };
+
+/**
+ * Formatea automáticamente la entrada de fecha con barras (/) y auto-completa el año
+ * @param value - El valor ingresado por el usuario
+ * @returns Objeto con el texto formateado y la fecha completa en formato YYYY-MM-DD
+ */
+export const formatDateInput = (value: string): { formatted: string; isoDate: string | null } => {
+  // Remover todo lo que no sea número
+  const numbers = value.replace(/\D/g, '');
+
+  let formatted = '';
+  let isoDate = null;
+
+  // Formatear DD/MM/YYYY con barras automáticas
+  if (numbers.length > 0) {
+    formatted = numbers.substring(0, 2);
+    if (numbers.length >= 3) {
+      formatted += '/' + numbers.substring(2, 4);
+    }
+    if (numbers.length >= 5) {
+      formatted += '/' + numbers.substring(4, 8);
+    }
+
+    // Auto-completar año si solo hay DD/MM (4 dígitos)
+    if (numbers.length === 4) {
+      const day = numbers.substring(0, 2);
+      const month = numbers.substring(2, 4);
+      const currentYear = new Date().getFullYear();
+
+      // Validar que día y mes sean válidos
+      const dayNum = parseInt(day);
+      const monthNum = parseInt(month);
+
+      if (dayNum >= 1 && dayNum <= 31 && monthNum >= 1 && monthNum <= 12) {
+        isoDate = `${currentYear}-${month}-${day}`;
+      }
+    } else if (numbers.length >= 8) {
+      // Convertir DD/MM/YYYY a YYYY-MM-DD para el estado interno
+      const day = numbers.substring(0, 2);
+      const month = numbers.substring(2, 4);
+      const year = numbers.substring(4, 8);
+
+      // Validar fecha
+      const dayNum = parseInt(day);
+      const monthNum = parseInt(month);
+
+      if (dayNum >= 1 && dayNum <= 31 && monthNum >= 1 && monthNum <= 12) {
+        isoDate = `${year}-${month}-${day}`;
+      }
+    }
+  }
+
+  return { formatted, isoDate };
+};
+
+/**
+ * Convierte fecha de formato YYYY-MM-DD a DD/MM/YYYY
+ * @param isoDate - Fecha en formato YYYY-MM-DD
+ * @returns Fecha en formato DD/MM/YYYY
+ */
+export const isoToDisplayDate = (isoDate: string): string => {
+  if (!isoDate) return '';
+  const [year, month, day] = isoDate.split('-');
+  return `${day}/${month}/${year}`;
+};

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import {
   Table,
   TableBody,
@@ -53,6 +53,7 @@ import { CommentDialog } from './CommentDialog';
 import { DebtDialog } from './DebtDialog';
 import * as MuiIcons from '@mui/icons-material';
 import { useSnackbar } from 'notistack';
+import { formatDateInput } from '@/utils';
 
 interface ExpenseTableProps {
   expenses: Expense[];
@@ -176,6 +177,28 @@ export const ExpenseTable = ({ expenses, categories, onEdit, onUpdate, onDelete,
   const [sortMenuPosition, setSortMenuPosition] = useState<{ top: number; left: number } | null>(null);
   const [optimisticIncludeInTotals, setOptimisticIncludeInTotals] = useState<Record<string, boolean>>({});
 
+  // Refs para controlar la posición del cursor
+  const inputRef = useRef<HTMLInputElement>(null);
+  const cursorPositionRef = useRef<number | null>(null);
+  const shouldRestoreCursor = useRef<boolean>(false);
+
+  // useEffect para restaurar la posición del cursor después de cambios de estado
+  useEffect(() => {
+    if (inputRef.current && cursorPositionRef.current !== null && shouldRestoreCursor.current) {
+      inputRef.current.setSelectionRange(cursorPositionRef.current, cursorPositionRef.current);
+      cursorPositionRef.current = null;
+      shouldRestoreCursor.current = false;
+    }
+  }, [editValue]);
+
+  // Función helper para manejar cambios de input preservando la posición del cursor
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    const input = e.target as HTMLInputElement;
+    cursorPositionRef.current = input.selectionStart;
+    shouldRestoreCursor.current = true;
+    setEditValue(e.target.value);
+  };
+
   // Inicializar expandedCategories con todas las categorías
   useEffect(() => {
     setExpandedCategories(new Set(categories.map(cat => cat.id!)));
@@ -242,8 +265,14 @@ export const ExpenseTable = ({ expenses, categories, onEdit, onUpdate, onDelete,
 
     // Convertir fecha de DD/MM/AAAA a AAAA-MM-DD si es un campo de fecha
     if (editingCell.field === 'vto' || editingCell.field === 'fechaPago') {
-      // Solo convertir si el formato es DD/MM/AAAA (con exactamente 10 caracteres)
-      if (editValue.includes('/') && editValue.length === 10) {
+      // Intentar obtener la fecha en formato ISO
+      const { isoDate } = formatDateInput(editValue);
+
+      if (isoDate) {
+        // Si formatDateInput devuelve una fecha válida (ya sea auto-completada o completa)
+        newValue = isoDate;
+      } else if (editValue.includes('/') && editValue.length === 10) {
+        // Fallback para fechas completas que no fueron procesadas
         const parts = editValue.split('/');
         if (parts.length === 3) {
           const [day, month, year] = parts;
@@ -252,8 +281,10 @@ export const ExpenseTable = ({ expenses, categories, onEdit, onUpdate, onDelete,
             newValue = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
           }
         }
+      } else {
+        // Si no es una fecha válida, guardar el texto tal cual (para '-', 'Bonificado', etc.)
+        newValue = editValue;
       }
-      // Si no es una fecha válida, guardar el texto tal cual
     } else if (editingCell.field === 'importe') {
       newValue = Number(editValue);
     }
@@ -619,7 +650,7 @@ export const ExpenseTable = ({ expenses, categories, onEdit, onUpdate, onDelete,
   const totalDebt = expenses.reduce((sum, exp) => sum + (exp.debt || 0), 0);
 
   // Componente para fila arrastrable
-  const SortableRow = ({ expense, children }: { expense: Expense; children: React.ReactNode }) => {
+  const SortableRow = ({ expense, children, disabled }: { expense: Expense; children: React.ReactNode; disabled?: boolean }) => {
     const {
       attributes,
       listeners,
@@ -630,6 +661,7 @@ export const ExpenseTable = ({ expenses, categories, onEdit, onUpdate, onDelete,
     } = useSortable({
       id: expense.id || '',
       data: { expense },
+      disabled: disabled || false,
     });
 
     const style = {
@@ -901,7 +933,7 @@ export const ExpenseTable = ({ expenses, categories, onEdit, onUpdate, onDelete,
                       </TableRow>
                     ) : (
                       catExpenses.map((expense) => (
-                        <SortableRow key={expense.id} expense={expense}>
+                        <SortableRow key={expense.id} expense={expense} disabled={editingCell !== null}>
                           <TableCell
                             sx={{ fontWeight: 500, cursor: 'pointer' }}
                             onDoubleClick={(e) => {
@@ -912,9 +944,11 @@ export const ExpenseTable = ({ expenses, categories, onEdit, onUpdate, onDelete,
                             {editingCell?.id === expense.id && editingCell?.field === 'item' ? (
                               <TextField
                                 value={editValue}
-                                onChange={(e) => setEditValue(e.target.value)}
+                                onChange={handleInputChange}
                                 onBlur={(e) => handleCellBlur(expense, e)}
                                 onKeyDown={(e) => handleKeyDown(e, expense)}
+                                onDoubleClick={(e) => e.stopPropagation()}
+                                inputRef={inputRef}
                                 autoFocus
                                 size="small"
                                 fullWidth
@@ -949,16 +983,26 @@ export const ExpenseTable = ({ expenses, categories, onEdit, onUpdate, onDelete,
                                 <TextField
                                   value={editValue}
                                   onChange={(e) => {
-                                    // Permitir escribir cualquier cosa
-                                    setEditValue(e.target.value);
+                                    const input = e.target.value;
+                                    // Si el usuario está borrando, permitir
+                                    if (input.length < editValue.length) {
+                                      setEditValue(input);
+                                      return;
+                                    }
+                                    // Usar formatDateInput para auto-formatear y auto-completar
+                                    const { formatted } = formatDateInput(input);
+                                    setEditValue(formatted);
                                   }}
                                   onBlur={(e) => handleCellBlur(expense, e)}
                                   onKeyDown={(e) => handleKeyDown(e, expense)}
+                                  onDoubleClick={(e) => e.stopPropagation()}
+                                  inputRef={inputRef}
                                   autoFocus
                                   size="small"
                                   variant="standard"
                                   sx={{ maxWidth: 140 }}
                                   placeholder="DD/MM/AAAA"
+                                  helperText="Escribe DD/MM para auto-completar año"
                                 />
                                 <Tooltip title="Limpiar">
                                   <IconButton
@@ -992,16 +1036,26 @@ export const ExpenseTable = ({ expenses, categories, onEdit, onUpdate, onDelete,
                                 <TextField
                                   value={editValue}
                                   onChange={(e) => {
-                                    // Permitir escribir cualquier cosa
-                                    setEditValue(e.target.value);
+                                    const input = e.target.value;
+                                    // Si el usuario está borrando, permitir
+                                    if (input.length < editValue.length) {
+                                      setEditValue(input);
+                                      return;
+                                    }
+                                    // Usar formatDateInput para auto-formatear y auto-completar
+                                    const { formatted } = formatDateInput(input);
+                                    setEditValue(formatted);
                                   }}
                                   onBlur={(e) => handleCellBlur(expense, e)}
                                   onKeyDown={(e) => handleKeyDown(e, expense)}
+                                  onDoubleClick={(e) => e.stopPropagation()}
+                                  inputRef={inputRef}
                                   autoFocus
                                   size="small"
                                   variant="standard"
                                   sx={{ maxWidth: 140 }}
                                   placeholder="DD/MM/AAAA"
+                                  helperText="Escribe DD/MM para auto-completar año"
                                 />
                                 <Tooltip title="Limpiar">
                                   <IconButton
@@ -1034,9 +1088,11 @@ export const ExpenseTable = ({ expenses, categories, onEdit, onUpdate, onDelete,
                             {editingCell?.id === expense.id && editingCell?.field === 'importe' ? (
                               <TextField
                                 value={editValue}
-                                onChange={(e) => setEditValue(e.target.value)}
+                                onChange={handleInputChange}
                                 onBlur={(e) => handleCellBlur(expense, e)}
                                 onKeyDown={(e) => handleKeyDown(e, expense)}
+                                onDoubleClick={(e) => e.stopPropagation()}
+                                inputRef={inputRef}
                                 autoFocus
                                 size="small"
                                 type="number"
@@ -1061,9 +1117,11 @@ export const ExpenseTable = ({ expenses, categories, onEdit, onUpdate, onDelete,
                             {editingCell?.id === expense.id && editingCell?.field === 'pagadoPor' ? (
                               <TextField
                                 value={editValue}
-                                onChange={(e) => setEditValue(e.target.value)}
+                                onChange={handleInputChange}
                                 onBlur={(e) => handleCellBlur(expense, e)}
                                 onKeyDown={(e) => handleKeyDown(e, expense)}
+                                onDoubleClick={(e) => e.stopPropagation()}
+                                inputRef={inputRef}
                                 autoFocus
                                 size="small"
                                 fullWidth
