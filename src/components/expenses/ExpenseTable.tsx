@@ -145,6 +145,8 @@ export const ExpenseTable = ({ expenses, categories, onEdit, onUpdate, onDelete,
   const [selectedCreditCard, setSelectedCreditCard] = useState<Expense | null>(null);
   const [unlinkConfirmDialogOpen, setUnlinkConfirmDialogOpen] = useState(false);
   const [expenseToUnlink, setExpenseToUnlink] = useState<Expense | null>(null);
+  const [deleteWarningDialogOpen, setDeleteWarningDialogOpen] = useState(false);
+  const [expenseToDelete, setExpenseToDelete] = useState<Expense | null>(null);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [statusMenuExpense, setStatusMenuExpense] = useState<Expense | null>(null);
   const [statusMenuPosition, setStatusMenuPosition] = useState<{ top: number; left: number } | null>(null);
@@ -436,6 +438,23 @@ export const ExpenseTable = ({ expenses, categories, onEdit, onUpdate, onDelete,
     if (!expense.linkedToCardId || !expense.id || !unlinkExpensesFromCard) return;
     setExpenseToUnlink(expense);
     setUnlinkConfirmDialogOpen(true);
+  };
+
+  const handleDeleteClick = (expense: Expense) => {
+    if (!expense.id) return;
+
+    // Validar si es una TC con gastos asociados
+    if (isCreditCard(expense)) {
+      const linkedExpenses = getLinkedExpenses(expense.id, expenses);
+      if (linkedExpenses.length > 0) {
+        setExpenseToDelete(expense);
+        setDeleteWarningDialogOpen(true);
+        return;
+      }
+    }
+
+    // Si no es TC o no tiene gastos asociados, eliminar directamente
+    onDelete(expense.id);
   };
 
   const confirmUnlinkFromCard = async () => {
@@ -1285,7 +1304,7 @@ export const ExpenseTable = ({ expenses, categories, onEdit, onUpdate, onDelete,
                             </IconButton>
                             <IconButton
                               size="small"
-                              onClick={() => expense.id && onDelete(expense.id)}
+                              onClick={() => handleDeleteClick(expense)}
                               color="error"
                             >
                               <DeleteIcon fontSize="small" />
@@ -1720,6 +1739,54 @@ export const ExpenseTable = ({ expenses, categories, onEdit, onUpdate, onDelete,
             sx={{ px: 3, py: 1 }}
           >
             Desasociar
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Dialog de advertencia: no se puede eliminar TC con gastos asociados */}
+      <Dialog
+        open={deleteWarningDialogOpen}
+        onClose={() => {
+          setDeleteWarningDialogOpen(false);
+          setExpenseToDelete(null);
+        }}
+        maxWidth="sm"
+      >
+        <DialogTitle sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+          <CancelIcon sx={{ color: '#ef4444' }} />
+          No se puede eliminar esta tarjeta
+        </DialogTitle>
+        <DialogContent sx={{ pr: 3 }}>
+          <Typography>
+            La tarjeta <strong>{expenseToDelete?.item}</strong> tiene{' '}
+            <strong>{expenseToDelete?.id ? getLinkedExpenses(expenseToDelete.id, expenses).length : 0} gasto(s) asociado(s)</strong>.
+          </Typography>
+          <Typography variant="body2" color="text.secondary" sx={{ mt: 2 }}>
+            Debes desasociar todos los gastos vinculados antes de poder eliminar esta tarjeta de crédito.
+          </Typography>
+          <Typography variant="body2" sx={{ mt: 2, fontWeight: 600 }}>
+            Para desasociar los gastos:
+          </Typography>
+          <Typography variant="body2" component="div" sx={{ mt: 1, pl: 2 }}>
+            1. Haz clic en el ícono de <strong>enlace (🔗)</strong> en esta tarjeta
+            <br />
+            2. Desmarca todos los gastos asociados
+            <br />
+            3. Guarda los cambios
+            <br />
+            4. Luego podrás eliminar la tarjeta
+          </Typography>
+        </DialogContent>
+        <DialogActions sx={{ px: 3, pb: 2 }}>
+          <Button
+            onClick={() => {
+              setDeleteWarningDialogOpen(false);
+              setExpenseToDelete(null);
+            }}
+            variant="contained"
+            sx={{ px: 3, py: 1 }}
+          >
+            Entendido
           </Button>
         </DialogActions>
       </Dialog>
