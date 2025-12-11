@@ -225,6 +225,48 @@ export const useExpenses = (month: number, year: number) => {
     }
   };
 
+  const linkExpensesToCard = async (cardId: string, expenseIds: string[]) => {
+    if (!user) throw new Error('User not authenticated');
+
+    try {
+      const batch = writeBatch(db);
+
+      expenseIds.forEach(expenseId => {
+        const expenseRef = doc(db, 'expenses', expenseId);
+        batch.update(expenseRef, {
+          linkedToCardId: cardId,
+          updatedAt: new Date()
+        });
+      });
+
+      await batch.commit();
+    } catch (error) {
+      console.error('Error linking expenses to card:', error);
+      throw error;
+    }
+  };
+
+  const unlinkExpensesFromCard = async (expenseIds: string[]) => {
+    if (!user) throw new Error('User not authenticated');
+
+    try {
+      const batch = writeBatch(db);
+
+      expenseIds.forEach(expenseId => {
+        const expenseRef = doc(db, 'expenses', expenseId);
+        batch.update(expenseRef, {
+          linkedToCardId: deleteField(),
+          updatedAt: new Date()
+        });
+      });
+
+      await batch.commit();
+    } catch (error) {
+      console.error('Error unlinking expenses from card:', error);
+      throw error;
+    }
+  };
+
   return {
     expenses,
     allExpenses,
@@ -234,5 +276,7 @@ export const useExpenses = (month: number, year: number) => {
     deleteExpense,
     applyTemplate,
     clearMonth,
+    linkExpensesToCard,
+    unlinkExpensesFromCard,
   };
 };

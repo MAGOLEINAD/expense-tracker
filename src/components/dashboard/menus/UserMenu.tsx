@@ -1,5 +1,6 @@
 import { IconButton, Avatar, Menu, MenuItem, Typography, Divider } from '@mui/material';
 import SettingsIcon from '@mui/icons-material/Settings';
+import PaletteIcon from '@mui/icons-material/Palette';
 import LogoutIcon from '@mui/icons-material/Logout';
 import type { User } from 'firebase/auth';
 
@@ -10,6 +11,7 @@ interface UserMenuProps {
   onOpenMenu: (event: React.MouseEvent<HTMLElement>) => void;
   onCloseMenu: () => void;
   onOpenSettings: () => void;
+  onOpenStatusColors: () => void;
   onLogout: () => void;
   size?: 'small' | 'medium';
   showBorder?: boolean;
@@ -22,12 +24,18 @@ export const UserMenu = ({
   onOpenMenu,
   onCloseMenu,
   onOpenSettings,
+  onOpenStatusColors,
   onLogout,
   size = 'small',
   showBorder = false,
 }: UserMenuProps) => {
   const handleSettingsClick = () => {
     onOpenSettings();
+    onCloseMenu();
+  };
+
+  const handleStatusColorsClick = () => {
+    onOpenStatusColors();
     onCloseMenu();
   };
 
@@ -57,6 +65,9 @@ export const UserMenu = ({
         <Divider />
         <MenuItem onClick={handleSettingsClick}>
           <SettingsIcon sx={{ mr: 1, fontSize: 18 }} /> Gestionar Categorías
+        </MenuItem>
+        <MenuItem onClick={handleStatusColorsClick}>
+          <PaletteIcon sx={{ mr: 1, fontSize: 18 }} /> Personalizar Estados
         </MenuItem>
         <MenuItem onClick={onLogout}>
           <LogoutIcon sx={{ mr: 1, fontSize: 18 }} /> Cerrar Sesión

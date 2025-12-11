@@ -28,6 +28,7 @@ interface DashboardAppBarProps {
   onOpenUserMenu: (event: React.MouseEvent<HTMLElement>) => void;
   onCloseUserMenu: () => void;
   onOpenSettings: () => void;
+  onOpenStatusColors: () => void;
   onLogout: () => void;
 }
 
@@ -51,6 +52,7 @@ export const DashboardAppBar = ({
   onOpenUserMenu,
   onCloseUserMenu,
   onOpenSettings,
+  onOpenStatusColors,
   onLogout,
 }: DashboardAppBarProps) => {
   return (
@@ -85,6 +87,7 @@ export const DashboardAppBar = ({
               onOpenMenu={onOpenUserMenu}
               onCloseMenu={onCloseUserMenu}
               onOpenSettings={onOpenSettings}
+              onOpenStatusColors={onOpenStatusColors}
               onLogout={onLogout}
               size="small"
             />
@@ -102,6 +105,7 @@ export const DashboardAppBar = ({
               onOpenMenu={onOpenUserMenu}
               onCloseMenu={onCloseUserMenu}
               onOpenSettings={onOpenSettings}
+              onOpenStatusColors={onOpenStatusColors}
               onLogout={onLogout}
               size="small"
               showBorder

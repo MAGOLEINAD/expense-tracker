@@ -1,4 +1,4 @@
-import type { Currency } from '@/types';
+import type { Currency, Expense } from '@/types';
 import { CURRENCY_SYMBOLS } from './constants';
 
 /**
@@ -108,4 +108,26 @@ export const isoToDisplayDate = (isoDate: string): string => {
   if (!isoDate) return '';
   const [year, month, day] = isoDate.split('-');
   return `${day}/${month}/${year}`;
+};
+
+/**
+ * Detecta si un gasto es una tarjeta de crédito (contiene "TC" en el nombre)
+ * @param expense - El gasto a verificar
+ * @returns true si el gasto es una TC, false en caso contrario
+ */
+export const isCreditCard = (expense: Expense): boolean => {
+  return expense.item.toUpperCase().includes('TC');
+};
+
+/**
+ * Obtiene todos los gastos vinculados a una tarjeta de crédito
+ * @param cardId - El ID de la tarjeta de crédito
+ * @param allExpenses - Array con todos los gastos
+ * @returns Array de gastos vinculados a la TC
+ */
+export const getLinkedExpenses = (
+  cardId: string,
+  allExpenses: Expense[]
+): Expense[] => {
+  return allExpenses.filter(exp => exp.linkedToCardId === cardId);
 };

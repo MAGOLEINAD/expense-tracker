@@ -44,16 +44,19 @@ import MoneyOffIcon from '@mui/icons-material/MoneyOff';
 import SortIcon from '@mui/icons-material/Sort';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import CancelIcon from '@mui/icons-material/Cancel';
+import LinkIcon from '@mui/icons-material/Link';
 import type { Expense, Category, PaymentStatus, UserCategory } from '@/types';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { useCategories } from '@/hooks/useCategories';
 import { useAuth } from '@/contexts/AuthContext';
+import { useStatusColors } from '@/hooks/useStatusColors';
 import { CommentDialog } from './CommentDialog';
 import { DebtDialog } from './DebtDialog';
+import { CardLinkDialog } from './CardLinkDialog';
 import * as MuiIcons from '@mui/icons-material';
 import { useSnackbar } from 'notistack';
-import { formatDateInput } from '@/utils';
+import { formatDateInput, isCreditCard, getLinkedExpenses } from '@/utils';
 
 interface ExpenseTableProps {
   expenses: Expense[];
@@ -63,6 +66,8 @@ interface ExpenseTableProps {
   onDelete: (id: string) => void;
   onDeleteMultiple?: (ids: string[]) => Promise<void>;
   onAdd?: (expense: Omit<Expense, 'id' | 'createdAt' | 'updatedAt'>) => void;
+  linkExpensesToCard?: (cardId: string, expenseIds: string[]) => Promise<void>;
+  unlinkExpensesFromCard?: (expenseIds: string[]) => Promise<void>;
   selectedMonth: number;
   selectedYear: number;
 }
@@ -78,41 +83,6 @@ const SORT_OPTIONS: { value: SortType; label: string }[] = [
   { value: 'importe', label: 'Importe (Mayor a menor)' },
   { value: 'vencimiento', label: 'Vencimiento (Más cercano)' },
 ];
-
-const getStatusColor = (status: PaymentStatus) => {
-  switch (status) {
-    case 'pagado':
-      return {
-        bgcolor: '#16a34a',
-        color: 'white',
-      };
-    case 'bonificado':
-      return {
-        bgcolor: '#0288d1',
-        color: 'white',
-      };
-    case 'pendiente':
-      return {
-        bgcolor: '#f59e0b',
-        color: 'white',
-      };
-    case 'pago anual':
-      return {
-        bgcolor: '#7c3aed',
-        color: 'white',
-      };
-    case 'sin cargo':
-      return {
-        bgcolor: '#06b6d4',
-        color: 'white',
-      };
-    default:
-      return {
-        bgcolor: '#9ca3af',
-        color: 'white',
-      };
-  }
-};
 
 const getCategoryIcon = (category: UserCategory | undefined, categoryIndex: number) => {
   // Si la categoría tiene un icono personalizado, usarlo
@@ -154,9 +124,10 @@ const getCategoryColor = (category: UserCategory | undefined, categoryIndex: num
   return DEFAULT_CATEGORY_COLORS[categoryIndex % DEFAULT_CATEGORY_COLORS.length];
 };
 
-export const ExpenseTable = ({ expenses, categories, onEdit, onUpdate, onDelete, onDeleteMultiple, onAdd, selectedMonth, selectedYear }: ExpenseTableProps) => {
+export const ExpenseTable = ({ expenses, categories, onEdit, onUpdate, onDelete, onDeleteMultiple, onAdd, linkExpensesToCard, unlinkExpensesFromCard, selectedMonth, selectedYear }: ExpenseTableProps) => {
   const { user } = useAuth();
   const { updateCategoryColors, toggleIncludeInTotals } = useCategories(user?.uid);
+  const { getStatusColor } = useStatusColors();
   const { enqueueSnackbar } = useSnackbar();
   const [usdRate, setUsdRate] = useState<number>(1200);
   const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set());
@@ -170,6 +141,10 @@ export const ExpenseTable = ({ expenses, categories, onEdit, onUpdate, onDelete,
   const [commentDialogOpen, setCommentDialogOpen] = useState(false);
   const [debtDialogOpen, setDebtDialogOpen] = useState(false);
   const [selectedExpense, setSelectedExpense] = useState<Expense | null>(null);
+  const [cardLinkDialogOpen, setCardLinkDialogOpen] = useState(false);
+  const [selectedCreditCard, setSelectedCreditCard] = useState<Expense | null>(null);
+  const [unlinkConfirmDialogOpen, setUnlinkConfirmDialogOpen] = useState(false);
+  const [expenseToUnlink, setExpenseToUnlink] = useState<Expense | null>(null);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [statusMenuExpense, setStatusMenuExpense] = useState<Expense | null>(null);
   const [statusMenuPosition, setStatusMenuPosition] = useState<{ top: number; left: number } | null>(null);
@@ -435,6 +410,48 @@ export const ExpenseTable = ({ expenses, categories, onEdit, onUpdate, onDelete,
     }
   };
 
+  const handleOpenCardLinkDialog = (creditCardExpense: Expense) => {
+    setSelectedCreditCard(creditCardExpense);
+    setCardLinkDialogOpen(true);
+  };
+
+  const handleSaveCardLinks = async (linkedIds: string[], unlinkedIds: string[]) => {
+    if (!selectedCreditCard?.id || !linkExpensesToCard || !unlinkExpensesFromCard) return;
+
+    try {
+      if (linkedIds.length > 0) {
+        await linkExpensesToCard(selectedCreditCard.id, linkedIds);
+      }
+      if (unlinkedIds.length > 0) {
+        await unlinkExpensesFromCard(unlinkedIds);
+      }
+      enqueueSnackbar('Asociaciones actualizadas', { variant: 'success' });
+    } catch (error) {
+      console.error('Error updating links:', error);
+      enqueueSnackbar('Error al actualizar asociaciones', { variant: 'error' });
+    }
+  };
+
+  const handleUnlinkFromCard = (expense: Expense) => {
+    if (!expense.linkedToCardId || !expense.id || !unlinkExpensesFromCard) return;
+    setExpenseToUnlink(expense);
+    setUnlinkConfirmDialogOpen(true);
+  };
+
+  const confirmUnlinkFromCard = async () => {
+    if (!expenseToUnlink?.id || !unlinkExpensesFromCard) return;
+
+    try {
+      await unlinkExpensesFromCard([expenseToUnlink.id]);
+      enqueueSnackbar('Gasto desasociado', { variant: 'success' });
+      setUnlinkConfirmDialogOpen(false);
+      setExpenseToUnlink(null);
+    } catch (error) {
+      console.error('Error unlinking:', error);
+      enqueueSnackbar('Error al desasociar gasto', { variant: 'error' });
+    }
+  };
+
   const handleStatusClick = (expense: Expense, event: React.MouseEvent<HTMLDivElement>) => {
     event.stopPropagation();
     event.preventDefault();
@@ -605,8 +622,16 @@ export const ExpenseTable = ({ expenses, categories, onEdit, onUpdate, onDelete,
       sortType
     );
 
-    // Filtrar solo gastos que NO están pendientes ni sin cargo para los totales
-    const paidExpenses = categoryExpenses.filter(exp => exp.status !== 'pendiente' && exp.status !== 'sin cargo');
+    // Filtrar solo gastos que NO están pendientes, sin cargo, o asociados a TC para los totales
+    const paidExpenses = categoryExpenses.filter(exp => {
+      // Excluir pendientes y sin cargo
+      if (exp.status === 'pendiente' || exp.status === 'sin cargo') return false;
+
+      // Excluir gastos asociados a tarjetas de crédito
+      if (exp.linkedToCardId && exp.linkedToCardId.trim() !== '') return false;
+
+      return true;
+    });
 
     const totalARS = paidExpenses
       .filter(exp => exp.currency === 'ARS')
@@ -648,6 +673,16 @@ export const ExpenseTable = ({ expenses, categories, onEdit, onUpdate, onDelete,
 
   // Calcular total de deudas
   const totalDebt = expenses.reduce((sum, exp) => sum + (exp.debt || 0), 0);
+
+  // Calcular total de gastos asociados a TCs
+  const linkedExpenses = expenses.filter(exp => exp.linkedToCardId);
+  const linkedTotalARS = linkedExpenses
+    .filter(exp => exp.currency === 'ARS')
+    .reduce((sum, exp) => sum + exp.importe, 0);
+  const linkedTotalUSD = linkedExpenses
+    .filter(exp => exp.currency === 'USD')
+    .reduce((sum, exp) => sum + exp.importe, 0);
+  const linkedTotalInARS = linkedTotalARS + (linkedTotalUSD * usdRate);
 
   // Componente para fila arrastrable
   const SortableRow = ({ expense, children, disabled }: { expense: Expense; children: React.ReactNode; disabled?: boolean }) => {
@@ -794,15 +829,23 @@ export const ExpenseTable = ({ expenses, categories, onEdit, onUpdate, onDelete,
                 <Typography variant="body2" sx={{ flexGrow: 1, fontWeight: 700, fontSize: '0.875rem' }}>
                   {categoryName}
                 </Typography>
-                <Typography variant="body2" sx={{ fontWeight: 600, fontSize: '0.875rem', mr: 1 }}>
-                  {totalARS > 0 && `$ ${totalARS.toLocaleString('es-AR', { maximumFractionDigits: 0 })}`}
-                  {totalARS > 0 && totalUSD > 0 && ' '}
-                  {totalUSD > 0 && (
-                    <span style={{ color: '#4ade80' }}>
-                      USD {totalUSD.toLocaleString('es-AR', { maximumFractionDigits: 0 })}
-                    </span>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mr: 1 }}>
+                  {totalARS > 0 && (
+                    <Typography variant="body2" sx={{ fontWeight: 600, fontSize: '0.875rem' }}>
+                      $ {totalARS.toLocaleString('es-AR', { maximumFractionDigits: 0 })}
+                    </Typography>
                   )}
-                </Typography>
+                  {totalARS > 0 && totalUSD > 0 && (
+                    <Typography variant="body2" sx={{ opacity: 0.6, fontWeight: 'bold', fontSize: '0.875rem' }}>
+                      •
+                    </Typography>
+                  )}
+                  {totalUSD > 0 && (
+                    <Typography variant="body2" sx={{ fontWeight: 600, fontSize: '0.875rem', color: '#4ade80' }}>
+                      USD {totalUSD.toLocaleString('es-AR', { maximumFractionDigits: 0 })}
+                    </Typography>
+                  )}
+                </Box>
                 <Typography variant="caption" sx={{ opacity: 0.8, fontSize: '0.7rem', mr: 1 }}>
                   {catExpenses.length} {catExpenses.length === 1 ? 'item' : 'items'}
                 </Typography>
@@ -968,6 +1011,22 @@ export const ExpenseTable = ({ expenses, categories, onEdit, onUpdate, onDelete,
                                   ) : null;
                                 })()}
                                 <span>{expense.item}</span>
+                                {/* Badge para TCs con gastos asociados */}
+                                {isCreditCard(expense) && (() => {
+                                  const linkedCount = getLinkedExpenses(expense.id || '', expenses).length;
+                                  return linkedCount > 0 ? (
+                                    <Chip
+                                      label={`${linkedCount} gasto${linkedCount === 1 ? '' : 's'}`}
+                                      size="small"
+                                      sx={{
+                                        height: 20,
+                                        fontSize: '0.7rem',
+                                        bgcolor: '#7c3aed',
+                                        color: 'white',
+                                      }}
+                                    />
+                                  ) : null;
+                                })()}
                               </Box>
                             )}
                           </TableCell>
@@ -1132,31 +1191,63 @@ export const ExpenseTable = ({ expenses, categories, onEdit, onUpdate, onDelete,
                             )}
                           </TableCell>
                           <TableCell>
-                            <Box
-                              onClick={(e) => handleStatusClick(expense, e)}
-                              sx={{
-                                display: 'inline-block',
-                                cursor: 'pointer',
-                              }}
-                            >
-                              <Chip
-                                label={expense.status.toUpperCase()}
-                                size="small"
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                              <Box
+                                onClick={(e) => handleStatusClick(expense, e)}
                                 sx={{
-                                  fontWeight: 600,
+                                  display: 'inline-block',
                                   cursor: 'pointer',
-                                  transition: 'all 0.2s',
-                                  pointerEvents: 'none',
-                                  '&:hover': {
-                                    transform: 'scale(1.05)',
-                                    boxShadow: '0 2px 8px rgba(0,0,0,0.2)',
-                                  },
-                                  ...getStatusColor(expense.status)
                                 }}
-                              />
+                              >
+                                <Chip
+                                  label={expense.status.toUpperCase()}
+                                  size="small"
+                                  sx={{
+                                    fontWeight: 600,
+                                    cursor: 'pointer',
+                                    transition: 'all 0.2s',
+                                    pointerEvents: 'none',
+                                    '&:hover': {
+                                      transform: 'scale(1.05)',
+                                      boxShadow: '0 2px 8px rgba(0,0,0,0.2)',
+                                    },
+                                    ...getStatusColor(expense.status)
+                                  }}
+                                />
+                              </Box>
+
+                              {/* Indicador de gasto asociado a TC */}
+                              {expense.linkedToCardId && (
+                                <Tooltip title="Clic para desasociar de TC" arrow>
+                                  <CreditCardIcon
+                                    fontSize="small"
+                                    sx={{
+                                      color: '#7c3aed',
+                                      cursor: 'pointer'
+                                    }}
+                                    onClick={() => handleUnlinkFromCard(expense)}
+                                  />
+                                </Tooltip>
+                              )}
                             </Box>
                           </TableCell>
                           <TableCell align="center">
+                            {/* Ícono para asociar gastos a TC */}
+                            {isCreditCard(expense) && (
+                              <Tooltip
+                                title={`Asociar gastos (${getLinkedExpenses(expense.id || '', expenses).length})`}
+                                arrow
+                              >
+                                <IconButton
+                                  size="small"
+                                  onClick={() => handleOpenCardLinkDialog(expense)}
+                                  color={getLinkedExpenses(expense.id || '', expenses).length > 0 ? 'primary' : 'default'}
+                                  sx={{ mr: 0.5 }}
+                                >
+                                  <LinkIcon fontSize="small" />
+                                </IconButton>
+                              </Tooltip>
+                            )}
                             <Tooltip title={expense.comment || ''} arrow>
                               <span>
                                 <IconButton
@@ -1266,20 +1357,38 @@ export const ExpenseTable = ({ expenses, categories, onEdit, onUpdate, onDelete,
                           </Box>
                         </TableCell>
                         <TableCell colSpan={2} align="right">
-                          <Box>
-                            {totalARS > 0 && (
-                              <Typography variant="body2" fontWeight="bold">
-                                $ {totalARS.toLocaleString('es-AR', { minimumFractionDigits: 2 })}
-                              </Typography>
+                          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
+                            {totalARS > 0 && totalUSD > 0 ? (
+                              // Cuando hay ambas monedas, mostrar con separador
+                              <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 1.5 }}>
+                                <Typography variant="body2" fontWeight="bold">
+                                  $ {totalARS.toLocaleString('es-AR', { minimumFractionDigits: 2 })}
+                                </Typography>
+                                <Typography variant="body2" sx={{ opacity: 0.4, fontWeight: 'bold' }}>
+                                  •
+                                </Typography>
+                                <Typography variant="body2" fontWeight="bold" sx={{ color: '#00897b' }}>
+                                  USD {totalUSD.toLocaleString('es-AR', { minimumFractionDigits: 2 })}
+                                </Typography>
+                              </Box>
+                            ) : (
+                              // Cuando hay solo una moneda
+                              <>
+                                {totalARS > 0 && (
+                                  <Typography variant="body2" fontWeight="bold">
+                                    $ {totalARS.toLocaleString('es-AR', { minimumFractionDigits: 2 })}
+                                  </Typography>
+                                )}
+                                {totalUSD > 0 && (
+                                  <Typography variant="body2" fontWeight="bold" sx={{ color: '#00897b' }}>
+                                    USD {totalUSD.toLocaleString('es-AR', { minimumFractionDigits: 2 })}
+                                  </Typography>
+                                )}
+                              </>
                             )}
                             {totalUSD > 0 && (
-                              <Typography variant="body2" fontWeight="bold" sx={{ color: '#00897b' }}>
-                                USD {totalUSD.toLocaleString('es-AR', { minimumFractionDigits: 2 })}
-                              </Typography>
-                            )}
-                            {totalUSD > 0 && (
-                              <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.5 }}>
-                                Total en ARS: $ {totalInARS.toLocaleString('es-AR', { minimumFractionDigits: 2 })}
+                              <Typography variant="caption" color="text.secondary" sx={{ display: 'block', fontStyle: 'italic' }}>
+                                Total: $ {totalInARS.toLocaleString('es-AR', { minimumFractionDigits: 2 })}
                               </Typography>
                             )}
                           </Box>
@@ -1373,6 +1482,29 @@ export const ExpenseTable = ({ expenses, categories, onEdit, onUpdate, onDelete,
                   </Typography>
                   <Typography variant="h6" fontWeight="bold" sx={{ color: '#f59e0b', fontSize: '1.25rem', lineHeight: 1.2 }}>
                     $ {excludedTotalInARS.toLocaleString('es-AR', { maximumFractionDigits: 0 })}
+                  </Typography>
+                </Box>
+              )}
+              {linkedTotalInARS > 0 && (
+                <Box sx={{
+                  textAlign: 'right',
+                  pl: 2,
+                  borderLeft: '1px solid rgba(255, 255, 255, 0.3)'
+                }}>
+                  <Typography variant="caption" sx={{
+                    opacity: 0.95,
+                    fontSize: '0.65rem',
+                    display: 'block',
+                    color: '#f0e7ff'
+                  }}>
+                    Asociados a TC
+                  </Typography>
+                  <Typography variant="h6" fontWeight="bold" sx={{
+                    color: '#e9d5ff',
+                    fontSize: '1.25rem',
+                    lineHeight: 1.2
+                  }}>
+                    $ {linkedTotalInARS.toLocaleString('es-AR', { maximumFractionDigits: 0 })}
                   </Typography>
                 </Box>
               )}
@@ -1540,6 +1672,57 @@ export const ExpenseTable = ({ expenses, categories, onEdit, onUpdate, onDelete,
         }}
         onSave={handleSaveDebt}
       />
+
+      {/* Dialog para asociar gastos a TC */}
+      <CardLinkDialog
+        open={cardLinkDialogOpen}
+        creditCardExpense={selectedCreditCard}
+        allExpenses={expenses}
+        usdRate={usdRate}
+        onClose={() => {
+          setCardLinkDialogOpen(false);
+          setSelectedCreditCard(null);
+        }}
+        onSave={handleSaveCardLinks}
+      />
+
+      {/* Dialog de confirmación para desasociar gasto */}
+      <Dialog
+        open={unlinkConfirmDialogOpen}
+        onClose={() => {
+          setUnlinkConfirmDialogOpen(false);
+          setExpenseToUnlink(null);
+        }}
+        maxWidth="sm"
+      >
+        <DialogTitle>Desasociar Gasto de Tarjeta</DialogTitle>
+        <DialogContent sx={{ pr: 3 }}>
+          <Typography>
+            ¿Estás seguro de que deseas desasociar el gasto <strong>{expenseToUnlink?.item}</strong> de la tarjeta de crédito?
+          </Typography>
+          <Typography variant="body2" color="text.secondary" sx={{ mt: 2 }}>
+            Este gasto volverá a sumarse al total general.
+          </Typography>
+        </DialogContent>
+        <DialogActions sx={{ px: 3, pb: 2 }}>
+          <Button
+            onClick={() => {
+              setUnlinkConfirmDialogOpen(false);
+              setExpenseToUnlink(null);
+            }}
+          >
+            Cancelar
+          </Button>
+          <Button
+            onClick={confirmUnlinkFromCard}
+            variant="contained"
+            color="primary"
+            sx={{ px: 3, py: 1 }}
+          >
+            Desasociar
+          </Button>
+        </DialogActions>
+      </Dialog>
 
       {/* DragOverlay para mostrar el elemento que se está arrastrando */}
       <DragOverlay>

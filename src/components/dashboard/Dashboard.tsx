@@ -4,6 +4,7 @@ import { useSnackbar } from 'notistack';
 import { useAuth } from '@/contexts/AuthContext';
 import { useExpenses } from '@/hooks/useExpenses';
 import { useCategories } from '@/hooks/useCategories';
+import { useStatusColors } from '@/hooks/useStatusColors';
 import { ExpenseDialog } from '@/components/expenses/ExpenseDialog';
 import { ExpenseTable } from '@/components/expenses/ExpenseTable';
 import { Charts } from '@/components/charts/Charts';
@@ -15,6 +16,7 @@ import { MobileDateControls } from './layout/MobileDateControls';
 import { DatePickerPopover } from './navigation/DatePickerPopover';
 import { UsdRatePopover } from './info/UsdRatePopover';
 import { TemplateDialog } from './dialogs/TemplateDialog';
+import { StatusColorsDialog } from './dialogs/StatusColorsDialog';
 import type { Expense } from '@/types';
 
 export const Dashboard = () => {
@@ -33,6 +35,7 @@ export const Dashboard = () => {
   const [templateDialogOpen, setTemplateDialogOpen] = useState(false);
   const [confirmDialogOpen, setConfirmDialogOpen] = useState(false);
   const [categoryManagerOpen, setCategoryManagerOpen] = useState(false);
+  const [statusColorsDialogOpen, setStatusColorsDialogOpen] = useState(false);
   const [mobileDrawerOpen, setMobileDrawerOpen] = useState(false);
 
   // Popover Anchors
@@ -57,9 +60,12 @@ export const Dashboard = () => {
     deleteExpense,
     applyTemplate,
     clearMonth,
+    linkExpensesToCard,
+    unlinkExpensesFromCard,
   } = useExpenses(selectedMonth, selectedYear);
 
   const { categories } = useCategories(user?.uid);
+  const { colors: statusColors, saveColors } = useStatusColors();
 
   // Fetch USD rate
   useEffect(() => {
@@ -199,6 +205,16 @@ export const Dashboard = () => {
     }
   };
 
+  const handleSaveStatusColors = async (colors: typeof statusColors) => {
+    try {
+      await saveColors(colors);
+      enqueueSnackbar('Colores guardados exitosamente', { variant: 'success' });
+    } catch (error) {
+      console.error('Error saving status colors:', error);
+      enqueueSnackbar('Error al guardar los colores', { variant: 'error' });
+    }
+  };
+
   return (
     <>
       <DashboardAppBar
@@ -222,6 +238,10 @@ export const Dashboard = () => {
         onCloseUserMenu={() => setAnchorEl(null)}
         onOpenSettings={() => {
           setCategoryManagerOpen(true);
+          setAnchorEl(null);
+        }}
+        onOpenStatusColors={() => {
+          setStatusColorsDialogOpen(true);
           setAnchorEl(null);
         }}
         onLogout={logout}
@@ -283,6 +303,8 @@ export const Dashboard = () => {
                 onDelete={handleDelete}
                 onDeleteMultiple={handleDeleteMultiple}
                 onAdd={addExpense}
+                linkExpensesToCard={linkExpensesToCard}
+                unlinkExpensesFromCard={unlinkExpensesFromCard}
                 selectedMonth={selectedMonth}
                 selectedYear={selectedYear}
               />
@@ -335,6 +357,13 @@ export const Dashboard = () => {
       <CategoryManager
         open={categoryManagerOpen}
         onClose={() => setCategoryManagerOpen(false)}
+      />
+
+      <StatusColorsDialog
+        open={statusColorsDialogOpen}
+        onClose={() => setStatusColorsDialogOpen(false)}
+        onSave={handleSaveStatusColors}
+        currentColors={statusColors}
       />
     </>
   );

@@ -32,5 +32,17 @@ service cloud.firestore {
       // Allow delete if user is authenticated
       allow delete: if request.auth != null;
     }
+
+    // Users can only read/write their own settings
+    match /userSettings/{userId} {
+      // Allow read if user is authenticated and document belongs to them
+      allow read: if request.auth != null && userId == request.auth.uid;
+
+      // Allow create/update if user is authenticated and document ID matches auth.uid
+      allow create, update: if request.auth != null && userId == request.auth.uid;
+
+      // Allow delete if user is authenticated and document belongs to them
+      allow delete: if request.auth != null && userId == request.auth.uid;
+    }
   }
 }
