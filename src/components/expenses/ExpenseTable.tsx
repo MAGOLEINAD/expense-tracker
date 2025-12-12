@@ -140,18 +140,32 @@ export const ExpenseTable = ({ expenses, categories, onEdit, onUpdate, onDelete,
     const cardTotalUSD = cardExpense.cardTotalUSD || 0;
     const cardUSDRate = cardExpense.cardUSDRate || usdRate;
 
-    // Total final de la TC en ARS
-    const cardFinalTotal = cardTotalARS + (cardTotalUSD * cardUSDRate);
-
     // Suma de gastos asociados
     const linkedExpenses = getLinkedExpenses(cardExpense.id || '', expenses);
-    const linkedTotal = linkedExpenses.reduce((sum, exp) => {
-      const amount = exp.currency === 'ARS' ? exp.importe : exp.importe * cardUSDRate;
-      return sum + amount;
-    }, 0);
 
-    // Importe calculado
-    return cardFinalTotal - linkedTotal;
+    // Si la TC está en USD, calcular todo en USD
+    if (cardExpense.currency === 'USD') {
+      // Total final de la TC en USD
+      const cardFinalTotal = cardTotalUSD + (cardTotalARS / cardUSDRate);
+
+      // Total de gastos asociados en USD
+      const linkedTotal = linkedExpenses.reduce((sum, exp) => {
+        const amount = exp.currency === 'USD' ? exp.importe : exp.importe / cardUSDRate;
+        return sum + amount;
+      }, 0);
+
+      return cardFinalTotal - linkedTotal;
+    } else {
+      // Si la TC está en ARS (o por defecto), calcular todo en ARS
+      const cardFinalTotal = cardTotalARS + (cardTotalUSD * cardUSDRate);
+
+      const linkedTotal = linkedExpenses.reduce((sum, exp) => {
+        const amount = exp.currency === 'ARS' ? exp.importe : exp.importe * cardUSDRate;
+        return sum + amount;
+      }, 0);
+
+      return cardFinalTotal - linkedTotal;
+    }
   };
   const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set());
   const [editingCell, setEditingCell] = useState<{ id: string; field: string } | null>(null);
@@ -190,6 +204,15 @@ export const ExpenseTable = ({ expenses, categories, onEdit, onUpdate, onDelete,
       shouldRestoreCursor.current = false;
     }
   }, [editValue]);
+
+  // useEffect para auto-seleccionar todo el texto cuando se edita el campo de importe
+  useEffect(() => {
+    if (inputRef.current && editingCell?.field === 'importe') {
+      setTimeout(() => {
+        inputRef.current?.select();
+      }, 0);
+    }
+  }, [editingCell]);
 
   // Función helper para manejar cambios de input preservando la posición del cursor
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
@@ -1211,11 +1234,16 @@ export const ExpenseTable = ({ expenses, categories, onEdit, onUpdate, onDelete,
                           </TableCell>
                           <TableCell
                             align="right"
-                            sx={{ fontWeight: 'medium', cursor: isCreditCard(expense) ? 'default' : 'pointer' }}
+                            sx={{ fontWeight: 'medium', cursor: 'pointer' }}
                             onDoubleClick={(e) => {
-                              if (isCreditCard(expense)) return; // No permitir edición de TCs
                               e.stopPropagation();
-                              handleCellDoubleClick(expense, 'importe');
+                              if (isCreditCard(expense)) {
+                                // Para TCs, abrir modal de edición
+                                onEdit(expense);
+                              } else {
+                                // Para gastos normales, permitir edición inline
+                                handleCellDoubleClick(expense, 'importe');
+                              }
                             }}
                           >
                             {editingCell?.id === expense.id && editingCell?.field === 'importe' && !isCreditCard(expense) ? (
@@ -1394,14 +1422,8 @@ export const ExpenseTable = ({ expenses, categories, onEdit, onUpdate, onDelete,
                       const includeInTotals = getIncludeInTotals(categoryId, category);
                       return (
                       <TableRow
-                        onClick={() => {
-                          if (category?.id) {
-                            handleToggleIncludeInTotals(category.id, includeInTotals);
-                          }
-                        }}
                         sx={{
                           background: 'linear-gradient(to right, #f1f5f9, #e2e8f0)',
-                          cursor: 'pointer',
                           transition: 'all 0.2s ease',
                           '&:hover': {
                             background: 'linear-gradient(to right, #e2e8f0, #cbd5e1)',
@@ -1417,36 +1439,54 @@ export const ExpenseTable = ({ expenses, categories, onEdit, onUpdate, onDelete,
                         <TableCell colSpan={7} align="right">
                           <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 1 }}>
                             <Box
+                              onClick={() => {
+                                if (category?.id) {
+                                  handleToggleIncludeInTotals(category.id, includeInTotals);
+                                }
+                              }}
                               sx={{
-                                display: 'flex',
+                                display: 'inline-flex',
                                 alignItems: 'center',
-                                transition: 'all 0.3s ease',
+                                gap: 1,
+                                cursor: 'pointer',
+                                transition: 'transform 0.2s ease, filter 0.2s ease',
                                 animation: categoryId in optimisticIncludeInTotals ? 'pulse 0.3s ease-in-out' : 'none',
                                 '@keyframes pulse': {
                                   '0%, 100%': { transform: 'scale(1)' },
                                   '50%': { transform: 'scale(1.2)' },
                                 },
+                                '&:hover': {
+                                  transform: 'scale(1.05)',
+                                  filter: 'brightness(0.9)',
+                                },
                               }}
                             >
-                              {includeInTotals ? (
-                                <CheckCircleIcon
-                                  sx={{
-                                    color: '#16a34a',
-                                    fontSize: 20,
-                                    transition: 'all 0.3s ease',
-                                  }}
-                                />
-                              ) : (
-                                <CancelIcon
-                                  sx={{
-                                    color: '#dc2626',
-                                    fontSize: 20,
-                                    transition: 'all 0.3s ease',
-                                  }}
-                                />
-                              )}
+                              <Box
+                                sx={{
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                }}
+                              >
+                                {includeInTotals ? (
+                                  <CheckCircleIcon
+                                    sx={{
+                                      color: '#16a34a',
+                                      fontSize: 20,
+                                      transition: 'all 0.3s ease',
+                                    }}
+                                  />
+                                ) : (
+                                  <CancelIcon
+                                    sx={{
+                                      color: '#dc2626',
+                                      fontSize: 20,
+                                      transition: 'all 0.3s ease',
+                                    }}
+                                  />
+                                )}
+                              </Box>
+                              <strong>SUBTOTAL:</strong>
                             </Box>
-                            <strong>SUBTOTAL:</strong>
                           </Box>
                         </TableCell>
                         <TableCell colSpan={2} align="right">

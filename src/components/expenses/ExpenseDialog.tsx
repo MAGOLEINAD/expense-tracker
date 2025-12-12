@@ -227,6 +227,18 @@ export const ExpenseDialog = ({
               value={formData.pagadoPor}
               onChange={(e) => setFormData({ ...formData, pagadoPor: e.target.value })}
             />
+            {isTC && (
+              <TextField
+                select
+                label="Moneda"
+                value={formData.currency}
+                onChange={(e) => setFormData({ ...formData, currency: e.target.value as Currency })}
+                sx={{ width: 120, flexShrink: 0 }}
+              >
+                <MenuItem value="ARS">$ ARS</MenuItem>
+                <MenuItem value="USD">USD</MenuItem>
+              </TextField>
+            )}
           </Box>
 
           <Box sx={{ display: 'flex', gap: 2 }}>
@@ -273,6 +285,7 @@ export const ExpenseDialog = ({
                   type="number"
                   value={cardTotalARS}
                   onChange={(e) => setCardTotalARS(Number(e.target.value) || 0)}
+                  onFocus={(e) => e.target.select()}
                   InputProps={{
                     startAdornment: <Typography sx={{ mr: 0.5, color: 'text.secondary' }}>$</Typography>,
                   }}
@@ -282,6 +295,7 @@ export const ExpenseDialog = ({
                   type="number"
                   value={cardTotalUSD}
                   onChange={(e) => setCardTotalUSD(Number(e.target.value) || 0)}
+                  onFocus={(e) => e.target.select()}
                   InputProps={{
                     startAdornment: <Typography sx={{ mr: 0.5, color: 'text.secondary' }}>USD</Typography>,
                   }}
@@ -293,6 +307,7 @@ export const ExpenseDialog = ({
                     fullWidth
                     value={cardUSDRate}
                     onChange={(e) => setCardUSDRate(Number(e.target.value) || 0)}
+                    onFocus={(e) => e.target.select()}
                     InputProps={{
                       startAdornment: <Typography sx={{ mr: 0.5, color: 'text.secondary' }}>$</Typography>,
                     }}

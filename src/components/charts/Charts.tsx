@@ -86,18 +86,32 @@ export const Charts = ({ allExpenses, currentYear, currentMonth, categories }: C
     const cardTotalUSD = cardExpense.cardTotalUSD || 0;
     const cardUSDRate = cardExpense.cardUSDRate || usdRate;
 
-    // Total final de la TC en ARS
-    const cardFinalTotal = cardTotalARS + (cardTotalUSD * cardUSDRate);
-
     // Suma de gastos asociados
     const linkedExpenses = allExpenses.filter(exp => exp.linkedToCardId === cardExpense.id);
-    const linkedTotal = linkedExpenses.reduce((sum, exp) => {
-      const amount = exp.currency === 'ARS' ? exp.importe : exp.importe * cardUSDRate;
-      return sum + amount;
-    }, 0);
 
-    // Importe calculado
-    return cardFinalTotal - linkedTotal;
+    // Si la TC está en USD, calcular todo en USD
+    if (cardExpense.currency === 'USD') {
+      // Total final de la TC en USD
+      const cardFinalTotal = cardTotalUSD + (cardTotalARS / cardUSDRate);
+
+      // Total de gastos asociados en USD
+      const linkedTotal = linkedExpenses.reduce((sum, exp) => {
+        const amount = exp.currency === 'USD' ? exp.importe : exp.importe / cardUSDRate;
+        return sum + amount;
+      }, 0);
+
+      return cardFinalTotal - linkedTotal;
+    } else {
+      // Si la TC está en ARS (o por defecto), calcular todo en ARS
+      const cardFinalTotal = cardTotalARS + (cardTotalUSD * cardUSDRate);
+
+      const linkedTotal = linkedExpenses.reduce((sum, exp) => {
+        const amount = exp.currency === 'ARS' ? exp.importe : exp.importe * cardUSDRate;
+        return sum + amount;
+      }, 0);
+
+      return cardFinalTotal - linkedTotal;
+    }
   };
 
   // Helper function to convert expense to ARS

@@ -136,7 +136,7 @@ export const useExpenses = (month: number, year: number) => {
     }
   };
 
-  const applyTemplate = async (sourceMonth: number, sourceYear: number, targetMonth: number, targetYear: number) => {
+  const applyTemplate = async (sourceMonth: number, sourceYear: number, targetMonth: number, targetYear: number, keepCardLinks: boolean = false) => {
     if (!user) return;
 
     try {
@@ -156,15 +156,28 @@ export const useExpenses = (month: number, year: number) => {
         });
       });
 
-      const sourceExpenses = snapshot.docs.map((doc: any) => doc.data()) as Expense[];
+      const sourceExpenses = snapshot.docs.map((doc: any) => ({
+        id: doc.id,
+        ...doc.data()
+      })) as Expense[];
 
       // Crear batch para agregar múltiples documentos
       const batch = writeBatch(db);
       const timestamp = new Date();
 
+      // Mapa para relacionar IDs antiguos con nuevos (para TCs)
+      const oldToNewIdMap = new Map<string, string>();
+
+      // Primera pasada: crear todos los documentos y mapear IDs
       sourceExpenses.forEach((expense) => {
         const newDocRef = doc(collection(db, 'expenses'));
-        batch.set(newDocRef, {
+        const newId = newDocRef.id;
+
+        if (expense.id) {
+          oldToNewIdMap.set(expense.id, newId);
+        }
+
+        const newExpense: any = {
           userId: user.uid,
           item: expense.item,
           category: expense.category,
@@ -182,8 +195,42 @@ export const useExpenses = (month: number, year: number) => {
           year: targetYear,
           createdAt: timestamp,
           updatedAt: timestamp,
-        });
+        };
+
+        // Si keepCardLinks está activado, mantener asociaciones y datos de TC
+        if (keepCardLinks) {
+          // Copiar datos de TC si existen
+          if (expense.cardTotalARS !== undefined) {
+            newExpense.cardTotalARS = expense.cardTotalARS;
+          }
+          if (expense.cardTotalUSD !== undefined) {
+            newExpense.cardTotalUSD = expense.cardTotalUSD;
+          }
+          if (expense.cardUSDRate !== undefined) {
+            newExpense.cardUSDRate = expense.cardUSDRate;
+          }
+        }
+
+        batch.set(newDocRef, newExpense);
       });
+
+      // Segunda pasada: actualizar linkedToCardId si keepCardLinks está activado
+      if (keepCardLinks) {
+        sourceExpenses.forEach((expense) => {
+          if (expense.linkedToCardId && expense.id) {
+            const newExpenseId = oldToNewIdMap.get(expense.id);
+            const newCardId = oldToNewIdMap.get(expense.linkedToCardId);
+
+            // Solo actualizar si ambos IDs se mapearon correctamente
+            if (newExpenseId && newCardId) {
+              const expenseRef = doc(db, 'expenses', newExpenseId);
+              batch.update(expenseRef, {
+                linkedToCardId: newCardId
+              });
+            }
+          }
+        });
+      }
 
       await batch.commit();
     } catch (error) {

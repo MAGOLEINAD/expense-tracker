@@ -61,6 +61,7 @@ export const CardLinkDialog = ({
       const linked = getLinkedExpenses(creditCardExpense.id, allExpenses);
       setSelectedIds(new Set(linked.map(exp => exp.id!).filter(Boolean)));
       setSearchTerm('');
+      setShowOnlySelected(false); // Siempre iniciar con el switch en OFF
 
       // Cargar valores de la TC si existen, sino usar default de la API
       setCardTotalARS(creditCardExpense.cardTotalARS || 0);
@@ -125,27 +126,45 @@ export const CardLinkDialog = ({
       .filter(exp => exp.currency === 'USD')
       .reduce((sum, exp) => sum + exp.importe, 0);
 
-    // Total de gastos asociados en ARS
-    const linkedExpensesTotal = totalARS + (totalUSD * cardUSDRate);
+    // Si la TC está en USD, calcular todo en USD
+    if (creditCardExpense?.currency === 'USD') {
+      // Total de gastos asociados en USD
+      const linkedExpensesTotal = totalUSD + (totalARS / cardUSDRate);
 
-    // Total final de la TC en ARS
-    const cardFinalTotal = cardTotalARS + (cardTotalUSD * cardUSDRate);
+      // Total final de la TC en USD
+      const cardFinalTotal = cardTotalUSD + (cardTotalARS / cardUSDRate);
 
-    // Importe calculado de la TC
-    const calculatedCardImporte = cardFinalTotal - linkedExpensesTotal;
+      // Importe calculado de la TC en USD
+      const calculatedCardImporte = cardFinalTotal - linkedExpensesTotal;
 
-    // Verificar si excede
-    const exceeds = linkedExpensesTotal > cardFinalTotal;
+      // Verificar si excede
+      const exceeds = linkedExpensesTotal > cardFinalTotal;
 
-    return {
-      totalARS,
-      totalUSD,
-      linkedExpensesTotal,
-      cardFinalTotal,
-      calculatedCardImporte,
-      exceeds
-    };
-  }, [selectedIds, eligibleExpenses, cardTotalARS, cardTotalUSD, cardUSDRate]);
+      return {
+        totalARS,
+        totalUSD,
+        linkedExpensesTotal,
+        cardFinalTotal,
+        calculatedCardImporte,
+        exceeds
+      };
+    } else {
+      // Si la TC está en ARS (o por defecto), calcular todo en ARS
+      const linkedExpensesTotal = totalARS + (totalUSD * cardUSDRate);
+      const cardFinalTotal = cardTotalARS + (cardTotalUSD * cardUSDRate);
+      const calculatedCardImporte = cardFinalTotal - linkedExpensesTotal;
+      const exceeds = linkedExpensesTotal > cardFinalTotal;
+
+      return {
+        totalARS,
+        totalUSD,
+        linkedExpensesTotal,
+        cardFinalTotal,
+        calculatedCardImporte,
+        exceeds
+      };
+    }
+  }, [selectedIds, eligibleExpenses, cardTotalARS, cardTotalUSD, cardUSDRate, creditCardExpense?.currency]);
 
   const handleToggle = (expenseId: string) => {
     const newSelected = new Set(selectedIds);
@@ -210,6 +229,7 @@ export const CardLinkDialog = ({
                 size="small"
                 value={cardTotalARS}
                 onChange={(e) => setCardTotalARS(Number(e.target.value) || 0)}
+                onFocus={(e) => e.target.select()}
                 InputProps={{
                   startAdornment: <Typography sx={{ mr: 0.5, color: 'text.secondary' }}>$</Typography>,
                 }}
@@ -220,6 +240,7 @@ export const CardLinkDialog = ({
                 size="small"
                 value={cardTotalUSD}
                 onChange={(e) => setCardTotalUSD(Number(e.target.value) || 0)}
+                onFocus={(e) => e.target.select()}
                 InputProps={{
                   startAdornment: <Typography sx={{ mr: 0.5, color: 'text.secondary' }}>USD</Typography>,
                 }}
@@ -232,6 +253,7 @@ export const CardLinkDialog = ({
                   fullWidth
                   value={cardUSDRate}
                   onChange={(e) => setCardUSDRate(Number(e.target.value) || 0)}
+                  onFocus={(e) => e.target.select()}
                   InputProps={{
                     startAdornment: <Typography sx={{ mr: 0.5, color: 'text.secondary' }}>$</Typography>,
                   }}

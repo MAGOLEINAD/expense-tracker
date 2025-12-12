@@ -13,6 +13,8 @@ import {
   Select,
   MenuItem,
   Button,
+  FormControlLabel,
+  Switch,
 } from '@mui/material';
 import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 import { MONTHS } from '@/utils';
@@ -23,7 +25,7 @@ interface TemplateDialogProps {
   selectedYear: number;
   hasExpenses: boolean;
   onClose: () => void;
-  onApplyTemplate: (sourceMonth: number, sourceYear: number) => void;
+  onApplyTemplate: (sourceMonth: number, sourceYear: number, keepCardLinks: boolean) => void;
   onClearMonth: () => void;
 }
 
@@ -38,9 +40,10 @@ export const TemplateDialog = ({
 }: TemplateDialogProps) => {
   const [sourceMonth, setSourceMonth] = useState(12);
   const [sourceYear, setSourceYear] = useState(new Date().getFullYear());
+  const [keepCardLinks, setKeepCardLinks] = useState(true);
 
   const handleApply = () => {
-    onApplyTemplate(sourceMonth, sourceYear);
+    onApplyTemplate(sourceMonth, sourceYear, keepCardLinks);
     onClose();
   };
 
@@ -89,6 +92,20 @@ export const TemplateDialog = ({
               ))}
             </Select>
           </FormControl>
+          <FormControlLabel
+            control={
+              <Switch
+                checked={keepCardLinks}
+                onChange={(e) => setKeepCardLinks(e.target.checked)}
+                color="primary"
+              />
+            }
+            label={
+              <Typography variant="body2">
+                Mantener gastos asociados a TCs
+              </Typography>
+            }
+          />
           <Alert severity="success">
             Destino: <strong>{MONTHS[selectedMonth - 1]} {selectedYear}</strong>
           </Alert>
