@@ -858,7 +858,7 @@ export const ExpenseTable = ({ expenses, categories, onEdit, onUpdate, onDelete,
         </Paper>
       ) : (
         <Stack spacing={1.5}>
-        {categoryTotals.map(({ categoryId, categoryName, categoryIndex, expenses: catExpenses, subtotalARS, subtotalUSD, linkedARS, linkedUSD, linkedTotal }) => {
+        {categoryTotals.map(({ categoryId, categoryName, categoryIndex, expenses: catExpenses, subtotalARS, subtotalUSD }) => {
           const category = categories.find(c => c.id === categoryId);
           // Si estamos editando esta categoría, usar colores temporales
           const colors = editingColor === categoryId
