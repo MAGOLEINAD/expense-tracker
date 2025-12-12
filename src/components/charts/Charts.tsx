@@ -75,9 +75,35 @@ export const Charts = ({ allExpenses, currentYear, currentMonth, categories }: C
       });
   }, []);
 
+  // Helper function to calculate card importe
+  const calculateCardImporte = (cardExpense: Expense): number => {
+    const isCreditCard = cardExpense.item.toLowerCase().includes('tc');
+
+    if (!isCreditCard) return cardExpense.importe;
+
+    // Obtener totales de la TC
+    const cardTotalARS = cardExpense.cardTotalARS || 0;
+    const cardTotalUSD = cardExpense.cardTotalUSD || 0;
+    const cardUSDRate = cardExpense.cardUSDRate || usdRate;
+
+    // Total final de la TC en ARS
+    const cardFinalTotal = cardTotalARS + (cardTotalUSD * cardUSDRate);
+
+    // Suma de gastos asociados
+    const linkedExpenses = allExpenses.filter(exp => exp.linkedToCardId === cardExpense.id);
+    const linkedTotal = linkedExpenses.reduce((sum, exp) => {
+      const amount = exp.currency === 'ARS' ? exp.importe : exp.importe * cardUSDRate;
+      return sum + amount;
+    }, 0);
+
+    // Importe calculado
+    return cardFinalTotal - linkedTotal;
+  };
+
   // Helper function to convert expense to ARS
   const expenseToARS = (expense: Expense): number => {
-    return expense.currency === 'USD' ? expense.importe * usdRate : expense.importe;
+    const importe = calculateCardImporte(expense);
+    return expense.currency === 'USD' ? importe * usdRate : importe;
   };
 
   // Custom Tooltip Component
@@ -172,12 +198,13 @@ export const Charts = ({ allExpenses, currentYear, currentMonth, categories }: C
       if (!categoryTotals[exp.category]) {
         categoryTotals[exp.category] = { ars: 0, usd: 0, totalARS: 0 };
       }
+      const importe = calculateCardImporte(exp);
       if (exp.currency === 'USD') {
-        categoryTotals[exp.category].usd += exp.importe;
-        categoryTotals[exp.category].totalARS += exp.importe * usdRate;
+        categoryTotals[exp.category].usd += importe;
+        categoryTotals[exp.category].totalARS += importe * usdRate;
       } else {
-        categoryTotals[exp.category].ars += exp.importe;
-        categoryTotals[exp.category].totalARS += exp.importe;
+        categoryTotals[exp.category].ars += importe;
+        categoryTotals[exp.category].totalARS += importe;
       }
     });
 
@@ -203,12 +230,13 @@ export const Charts = ({ allExpenses, currentYear, currentMonth, categories }: C
       if (!categoryTotals[exp.category]) {
         categoryTotals[exp.category] = { ars: 0, usd: 0, totalARS: 0 };
       }
+      const importe = calculateCardImporte(exp);
       if (exp.currency === 'USD') {
-        categoryTotals[exp.category].usd += exp.importe;
-        categoryTotals[exp.category].totalARS += exp.importe * usdRate;
+        categoryTotals[exp.category].usd += importe;
+        categoryTotals[exp.category].totalARS += importe * usdRate;
       } else {
-        categoryTotals[exp.category].ars += exp.importe;
-        categoryTotals[exp.category].totalARS += exp.importe;
+        categoryTotals[exp.category].ars += importe;
+        categoryTotals[exp.category].totalARS += importe;
       }
     });
 

@@ -24,6 +24,9 @@ export interface Expense {
   debt?: number; // Optional pending debt amount
   order?: number; // Order within category for drag-and-drop sorting
   linkedToCardId?: string; // ID of the credit card expense this is linked to
+  cardTotalARS?: number; // Total ARS de la TC (solo para gastos TC)
+  cardTotalUSD?: number; // Total USD de la TC (solo para gastos TC)
+  cardUSDRate?: number; // Cotización USD usada para la TC (solo para gastos TC)
   createdAt: Date;
   updatedAt: Date;
 }

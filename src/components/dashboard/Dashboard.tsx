@@ -330,6 +330,7 @@ export const Dashboard = () => {
         onOpenCategoryManager={() => {
           setCategoryManagerOpen(true);
         }}
+        usdRate={usdRates.venta}
       />
 
       <TemplateDialog

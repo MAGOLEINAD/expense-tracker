@@ -18,7 +18,10 @@ import {
   Divider,
   Switch,
   FormControlLabel,
+  IconButton,
+  Tooltip,
 } from '@mui/material';
+import RefreshIcon from '@mui/icons-material/Refresh';
 import type { Expense } from '@/types';
 import { isCreditCard, getLinkedExpenses } from '@/utils/formatters';
 import * as MuiIcons from '@mui/icons-material';
@@ -30,6 +33,7 @@ interface CardLinkDialogProps {
   usdRate: number;
   onClose: () => void;
   onSave: (linkedIds: string[], unlinkedIds: string[]) => Promise<void>;
+  onUpdateCard?: (updatedCard: Expense) => Promise<void>;
 }
 
 export const CardLinkDialog = ({
@@ -39,20 +43,32 @@ export const CardLinkDialog = ({
   usdRate,
   onClose,
   onSave,
+  onUpdateCard,
 }: CardLinkDialogProps) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [saving, setSaving] = useState(false);
   const [showOnlySelected, setShowOnlySelected] = useState(false);
 
-  // Inicializar selecciones cuando se abre el dialog
+  // Estados para los totales de la TC
+  const [cardTotalARS, setCardTotalARS] = useState<number>(0);
+  const [cardTotalUSD, setCardTotalUSD] = useState<number>(0);
+  const [cardUSDRate, setCardUSDRate] = useState<number>(usdRate);
+
+  // Inicializar selecciones y valores de TC cuando se abre el dialog
   useEffect(() => {
     if (open && creditCardExpense?.id) {
       const linked = getLinkedExpenses(creditCardExpense.id, allExpenses);
       setSelectedIds(new Set(linked.map(exp => exp.id!).filter(Boolean)));
       setSearchTerm('');
+
+      // Cargar valores de la TC si existen, sino usar default de la API
+      setCardTotalARS(creditCardExpense.cardTotalARS || 0);
+      setCardTotalUSD(creditCardExpense.cardTotalUSD || 0);
+      // Si la TC ya tiene una cotización guardada, usarla; sino usar la de la API
+      setCardUSDRate(creditCardExpense.cardUSDRate || usdRate);
     }
-  }, [open, creditCardExpense, allExpenses]);
+  }, [open, creditCardExpense, allExpenses, usdRate]);
 
   // Filtrar gastos elegibles
   const eligibleExpenses = useMemo(() => {
@@ -100,6 +116,7 @@ export const CardLinkDialog = ({
   const totals = useMemo(() => {
     const selected = eligibleExpenses.filter(exp => selectedIds.has(exp.id!));
 
+    // Suma de gastos asociados seleccionados
     const totalARS = selected
       .filter(exp => exp.currency === 'ARS')
       .reduce((sum, exp) => sum + exp.importe, 0);
@@ -108,21 +125,27 @@ export const CardLinkDialog = ({
       .filter(exp => exp.currency === 'USD')
       .reduce((sum, exp) => sum + exp.importe, 0);
 
-    const cardTotal = creditCardExpense?.importe || 0;
-    const cardCurrency = creditCardExpense?.currency || 'ARS';
+    // Total de gastos asociados en ARS
+    const linkedExpensesTotal = totalARS + (totalUSD * cardUSDRate);
 
-    // Convertir todo a la moneda de la TC para comparar
-    let totalInCardCurrency: number;
-    if (cardCurrency === 'ARS') {
-      totalInCardCurrency = totalARS + (totalUSD * usdRate);
-    } else {
-      totalInCardCurrency = totalUSD + (totalARS / usdRate);
-    }
+    // Total final de la TC en ARS
+    const cardFinalTotal = cardTotalARS + (cardTotalUSD * cardUSDRate);
 
-    const exceeds = totalInCardCurrency > cardTotal;
+    // Importe calculado de la TC
+    const calculatedCardImporte = cardFinalTotal - linkedExpensesTotal;
 
-    return { totalARS, totalUSD, cardTotal, cardCurrency, totalInCardCurrency, exceeds };
-  }, [selectedIds, eligibleExpenses, creditCardExpense, usdRate]);
+    // Verificar si excede
+    const exceeds = linkedExpensesTotal > cardFinalTotal;
+
+    return {
+      totalARS,
+      totalUSD,
+      linkedExpensesTotal,
+      cardFinalTotal,
+      calculatedCardImporte,
+      exceeds
+    };
+  }, [selectedIds, eligibleExpenses, cardTotalARS, cardTotalUSD, cardUSDRate]);
 
   const handleToggle = (expenseId: string) => {
     const newSelected = new Set(selectedIds);
@@ -144,6 +167,19 @@ export const CardLinkDialog = ({
       const newlyLinked = Array.from(selectedIds).filter(id => !currentlyLinked.includes(id));
       const newlyUnlinked = currentlyLinked.filter(id => !selectedIds.has(id));
 
+      // Actualizar la TC con los nuevos valores y el importe calculado
+      if (onUpdateCard) {
+        const updatedCard: Expense = {
+          ...creditCardExpense,
+          cardTotalARS,
+          cardTotalUSD,
+          cardUSDRate,
+          importe: totals.calculatedCardImporte,
+        };
+        await onUpdateCard(updatedCard);
+      }
+
+      // Guardar los links
       await onSave(newlyLinked, newlyUnlinked);
       onClose();
     } catch (error) {
@@ -158,19 +194,70 @@ export const CardLinkDialog = ({
   return (
     <Dialog open={open} onClose={onClose} maxWidth="md" fullWidth>
       <DialogTitle>
-        Asociar Gastos a {creditCardExpense.item}
+        Restar Gastos - {creditCardExpense.item}
       </DialogTitle>
       <DialogContent>
         <Box sx={{ pt: 1 }}>
-          {/* Información de la TC */}
-          <Box sx={{ mb: 2, p: 2, bgcolor: 'action.hover', borderRadius: 1 }}>
-            <Typography variant="body2" color="text.secondary">
-              Importe de la tarjeta:
+          {/* Inputs para totales de la TC */}
+          <Box sx={{ mb: 3, p: 2, bgcolor: 'action.hover', borderRadius: 1 }}>
+            <Typography variant="subtitle2" color="text.primary" sx={{ mb: 2, fontWeight: 600 }}>
+              Totales de la Tarjeta
             </Typography>
-            <Typography variant="h6" color="primary">
-              {totals.cardCurrency === 'USD' ? 'USD ' : '$'}
-              {creditCardExpense.importe.toLocaleString('es-AR', { maximumFractionDigits: totals.cardCurrency === 'USD' ? 2 : 0 })}
-            </Typography>
+            <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 2 }}>
+              <TextField
+                label="Total ARS"
+                type="number"
+                size="small"
+                value={cardTotalARS}
+                onChange={(e) => setCardTotalARS(Number(e.target.value) || 0)}
+                InputProps={{
+                  startAdornment: <Typography sx={{ mr: 0.5, color: 'text.secondary' }}>$</Typography>,
+                }}
+              />
+              <TextField
+                label="Total USD"
+                type="number"
+                size="small"
+                value={cardTotalUSD}
+                onChange={(e) => setCardTotalUSD(Number(e.target.value) || 0)}
+                InputProps={{
+                  startAdornment: <Typography sx={{ mr: 0.5, color: 'text.secondary' }}>USD</Typography>,
+                }}
+              />
+              <Box sx={{ display: 'flex', gap: 0.5, alignItems: 'flex-end' }}>
+                <TextField
+                  label="Cotización USD"
+                  type="number"
+                  size="small"
+                  fullWidth
+                  value={cardUSDRate}
+                  onChange={(e) => setCardUSDRate(Number(e.target.value) || 0)}
+                  InputProps={{
+                    startAdornment: <Typography sx={{ mr: 0.5, color: 'text.secondary' }}>$</Typography>,
+                  }}
+                />
+                <Tooltip title="Recargar cotización de la API" arrow>
+                  <IconButton
+                    size="small"
+                    onClick={() => setCardUSDRate(usdRate)}
+                    color="primary"
+                    sx={{ flexShrink: 0, mb: 0.5 }}
+                  >
+                    <RefreshIcon fontSize="small" />
+                  </IconButton>
+                </Tooltip>
+              </Box>
+            </Box>
+
+            {/* Total Final de la TC */}
+            <Box sx={{ mt: 2, pt: 2, borderTop: '1px solid', borderColor: 'divider' }}>
+              <Typography variant="body2" color="text.secondary">
+                Total Final de la TC:
+              </Typography>
+              <Typography variant="h6" color="primary" fontWeight="bold">
+                $ {totals.cardFinalTotal.toLocaleString('es-AR', { maximumFractionDigits: 0 })}
+              </Typography>
+            </Box>
           </Box>
 
           {/* Buscador y filtros */}
@@ -204,9 +291,8 @@ export const CardLinkDialog = ({
           {/* Alerta si excede */}
           {totals.exceeds && (
             <Alert severity="warning" sx={{ mb: 2 }}>
-              El total seleccionado ({totals.cardCurrency === 'USD' ? 'USD ' : '$'}
-              {totals.totalInCardCurrency.toLocaleString('es-AR', { maximumFractionDigits: totals.cardCurrency === 'USD' ? 2 : 0 })})
-              excede el importe de la TC
+              Los gastos seleccionados (${totals.linkedExpensesTotal.toLocaleString('es-AR', { maximumFractionDigits: 0 })})
+              exceden el total final de la TC (${totals.cardFinalTotal.toLocaleString('es-AR', { maximumFractionDigits: 0 })})
             </Alert>
           )}
 
@@ -295,40 +381,42 @@ export const CardLinkDialog = ({
             </Box>
 
             {/* Comparación con la TC */}
-            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', p: 2, bgcolor: 'action.hover', borderRadius: 1 }}>
+            <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 2, p: 2, bgcolor: 'action.hover', borderRadius: 1 }}>
               <Box>
                 <Typography variant="caption" color="text.secondary">
-                  Total en {totals.cardCurrency}
+                  Gastos Asociados
                 </Typography>
                 <Typography variant="h6" fontWeight="bold">
-                  {totals.cardCurrency === 'USD' ? 'USD ' : '$'}
-                  {totals.totalInCardCurrency.toLocaleString('es-AR', { maximumFractionDigits: totals.cardCurrency === 'USD' ? 2 : 0 })}
+                  $ {totals.linkedExpensesTotal.toLocaleString('es-AR', { maximumFractionDigits: 0 })}
                 </Typography>
               </Box>
-              <Typography variant="h6" sx={{ mx: 2, opacity: 0.5 }}>
-                /
-              </Typography>
+              <Box sx={{ textAlign: 'center' }}>
+                <Typography variant="caption" color="text.secondary">
+                  Total Final TC
+                </Typography>
+                <Typography variant="h6" fontWeight="bold" color="primary">
+                  $ {totals.cardFinalTotal.toLocaleString('es-AR', { maximumFractionDigits: 0 })}
+                </Typography>
+              </Box>
               <Box sx={{ textAlign: 'right' }}>
                 <Typography variant="caption" color="text.secondary">
                   Importe TC
                 </Typography>
-                <Typography variant="h6" fontWeight="bold" color="primary">
-                  {totals.cardCurrency === 'USD' ? 'USD ' : '$'}
-                  {totals.cardTotal.toLocaleString('es-AR', { maximumFractionDigits: totals.cardCurrency === 'USD' ? 2 : 0 })}
+                <Typography variant="h6" fontWeight="bold" color={totals.calculatedCardImporte < 0 ? 'error' : 'success.main'}>
+                  $ {totals.calculatedCardImporte.toLocaleString('es-AR', { maximumFractionDigits: 0 })}
                 </Typography>
               </Box>
             </Box>
 
             {/* Mensaje de disponible/exceso */}
-            {!totals.exceeds && selectedIds.size > 0 && (
+            {!totals.exceeds && totals.cardFinalTotal > 0 && (
               <Typography variant="caption" color="success.main" sx={{ display: 'block', textAlign: 'center' }}>
-                ✓ Quedan {totals.cardCurrency === 'USD' ? 'USD ' : '$'}
-                {(totals.cardTotal - totals.totalInCardCurrency).toLocaleString('es-AR', { maximumFractionDigits: totals.cardCurrency === 'USD' ? 2 : 0 })} disponibles
+                ✓ El importe de la TC será: ${totals.calculatedCardImporte.toLocaleString('es-AR', { maximumFractionDigits: 0 })}
               </Typography>
             )}
-            {totals.cardCurrency !== 'ARS' && (totals.totalARS > 0 || totals.totalUSD > 0) && (
+            {cardTotalUSD > 0 && (
               <Typography variant="caption" color="text.secondary" sx={{ display: 'block', textAlign: 'center', fontStyle: 'italic' }}>
-                Tasa: 1 USD = ${usdRate.toLocaleString('es-AR')}
+                Cotización USD: ${cardUSDRate.toLocaleString('es-AR')}
               </Typography>
             )}
           </Box>
@@ -339,7 +427,7 @@ export const CardLinkDialog = ({
           Cancelar
         </Button>
         <Button onClick={handleSave} variant="contained" disabled={saving}>
-          {saving ? 'Guardando...' : 'Guardar Asociaciones'}
+          {saving ? 'Guardando...' : 'Guardar'}
         </Button>
       </DialogActions>
     </Dialog>

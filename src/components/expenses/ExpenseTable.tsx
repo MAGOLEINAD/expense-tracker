@@ -130,6 +130,29 @@ export const ExpenseTable = ({ expenses, categories, onEdit, onUpdate, onDelete,
   const { getStatusColor } = useStatusColors();
   const { enqueueSnackbar } = useSnackbar();
   const [usdRate, setUsdRate] = useState<number>(1200);
+
+  // Función helper para calcular el importe de una TC
+  const calculateCardImporte = (cardExpense: Expense): number => {
+    if (!isCreditCard(cardExpense)) return cardExpense.importe;
+
+    // Obtener totales de la TC
+    const cardTotalARS = cardExpense.cardTotalARS || 0;
+    const cardTotalUSD = cardExpense.cardTotalUSD || 0;
+    const cardUSDRate = cardExpense.cardUSDRate || usdRate;
+
+    // Total final de la TC en ARS
+    const cardFinalTotal = cardTotalARS + (cardTotalUSD * cardUSDRate);
+
+    // Suma de gastos asociados
+    const linkedExpenses = getLinkedExpenses(cardExpense.id || '', expenses);
+    const linkedTotal = linkedExpenses.reduce((sum, exp) => {
+      const amount = exp.currency === 'ARS' ? exp.importe : exp.importe * cardUSDRate;
+      return sum + amount;
+    }, 0);
+
+    // Importe calculado
+    return cardFinalTotal - linkedTotal;
+  };
   const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set());
   const [editingCell, setEditingCell] = useState<{ id: string; field: string } | null>(null);
   const [editValue, setEditValue] = useState<string>('');
@@ -641,32 +664,63 @@ export const ExpenseTable = ({ expenses, categories, onEdit, onUpdate, onDelete,
       sortType
     );
 
-    // Filtrar solo gastos que NO están pendientes, sin cargo, o asociados a TC para los totales
+    // Filtrar gastos pagados (excluir pendientes y sin cargo)
     const paidExpenses = categoryExpenses.filter(exp => {
-      // Excluir pendientes y sin cargo
       if (exp.status === 'pendiente' || exp.status === 'sin cargo') return false;
-
-      // Excluir gastos asociados a tarjetas de crédito
-      if (exp.linkedToCardId && exp.linkedToCardId.trim() !== '') return false;
-
       return true;
     });
 
+    // Subtotal de categoría (incluye gastos asociados a TC) - para mostrar en el subtotal
+    const subtotalARS = paidExpenses
+      .filter(exp => exp.currency === 'ARS')
+      .reduce((sum, exp) => {
+        const importe = isCreditCard(exp) ? calculateCardImporte(exp) : exp.importe;
+        return sum + importe;
+      }, 0);
+    const subtotalUSD = paidExpenses
+      .filter(exp => exp.currency === 'USD')
+      .reduce((sum, exp) => {
+        const importe = isCreditCard(exp) ? calculateCardImporte(exp) : exp.importe;
+        return sum + importe;
+      }, 0);
+
+    // Total para el gran total (excluye gastos asociados a TC) - para el total general
     const totalARS = paidExpenses
+      .filter(exp => exp.currency === 'ARS' && (!exp.linkedToCardId || exp.linkedToCardId.trim() === ''))
+      .reduce((sum, exp) => {
+        const importe = isCreditCard(exp) ? calculateCardImporte(exp) : exp.importe;
+        return sum + importe;
+      }, 0);
+    const totalUSD = paidExpenses
+      .filter(exp => exp.currency === 'USD' && (!exp.linkedToCardId || exp.linkedToCardId.trim() === ''))
+      .reduce((sum, exp) => {
+        const importe = isCreditCard(exp) ? calculateCardImporte(exp) : exp.importe;
+        return sum + importe;
+      }, 0);
+
+    // Calcular total de gastos asociados a TC en esta categoría
+    const linkedExpensesInCategory = categoryExpenses.filter(exp => exp.linkedToCardId && exp.linkedToCardId.trim() !== '');
+    const linkedARS = linkedExpensesInCategory
       .filter(exp => exp.currency === 'ARS')
       .reduce((sum, exp) => sum + exp.importe, 0);
-    const totalUSD = paidExpenses
+    const linkedUSD = linkedExpensesInCategory
       .filter(exp => exp.currency === 'USD')
       .reduce((sum, exp) => sum + exp.importe, 0);
+    const linkedTotal = linkedARS + (linkedUSD * usdRate);
 
     return {
       categoryId: userCategory.id!,
       categoryName: userCategory.name,
       categoryIndex: index,
       expenses: categoryExpenses,
-      totalARS,
-      totalUSD,
-      totalInARS: totalARS + (totalUSD * usdRate)
+      subtotalARS,        // Para mostrar en el subtotal de categoría
+      subtotalUSD,        // Para mostrar en el subtotal de categoría
+      totalARS,           // Para el total general (sin gastos asociados)
+      totalUSD,           // Para el total general (sin gastos asociados)
+      totalInARS: totalARS + (totalUSD * usdRate),
+      linkedARS,
+      linkedUSD,
+      linkedTotal
     };
   }).filter(cat => cat.expenses.length > 0); // Solo mostrar categorías con gastos
 
@@ -804,7 +858,7 @@ export const ExpenseTable = ({ expenses, categories, onEdit, onUpdate, onDelete,
         </Paper>
       ) : (
         <Stack spacing={1.5}>
-        {categoryTotals.map(({ categoryId, categoryName, categoryIndex, expenses: catExpenses, totalARS, totalUSD, totalInARS }) => {
+        {categoryTotals.map(({ categoryId, categoryName, categoryIndex, expenses: catExpenses, subtotalARS, subtotalUSD, linkedARS, linkedUSD, linkedTotal }) => {
           const category = categories.find(c => c.id === categoryId);
           // Si estamos editando esta categoría, usar colores temporales
           const colors = editingColor === categoryId
@@ -849,19 +903,19 @@ export const ExpenseTable = ({ expenses, categories, onEdit, onUpdate, onDelete,
                   {categoryName}
                 </Typography>
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mr: 1 }}>
-                  {totalARS > 0 && (
+                  {subtotalARS > 0 && (
                     <Typography variant="body2" sx={{ fontWeight: 600, fontSize: '0.875rem' }}>
-                      $ {totalARS.toLocaleString('es-AR', { maximumFractionDigits: 0 })}
+                      $ {subtotalARS.toLocaleString('es-AR', { maximumFractionDigits: 0 })}
                     </Typography>
                   )}
-                  {totalARS > 0 && totalUSD > 0 && (
+                  {subtotalARS > 0 && subtotalUSD > 0 && (
                     <Typography variant="body2" sx={{ opacity: 0.6, fontWeight: 'bold', fontSize: '0.875rem' }}>
                       •
                     </Typography>
                   )}
-                  {totalUSD > 0 && (
+                  {subtotalUSD > 0 && (
                     <Typography variant="body2" sx={{ fontWeight: 600, fontSize: '0.875rem', color: '#4ade80' }}>
-                      USD {totalUSD.toLocaleString('es-AR', { maximumFractionDigits: 0 })}
+                      USD {subtotalUSD.toLocaleString('es-AR', { maximumFractionDigits: 0 })}
                     </Typography>
                   )}
                 </Box>
@@ -971,7 +1025,7 @@ export const ExpenseTable = ({ expenses, categories, onEdit, onUpdate, onDelete,
                       <TableCell align="right">Importe</TableCell>
                       <TableCell>Pagado Por</TableCell>
                       <TableCell>Estado</TableCell>
-                      <TableCell align="center">Acciones</TableCell>
+                      <TableCell align="right" sx={{ pr: 2 }}>Acciones</TableCell>
                     </TableRow>
                   </TableHead>
                   <TableBody>
@@ -1157,13 +1211,14 @@ export const ExpenseTable = ({ expenses, categories, onEdit, onUpdate, onDelete,
                           </TableCell>
                           <TableCell
                             align="right"
-                            sx={{ fontWeight: 'medium', cursor: 'pointer' }}
+                            sx={{ fontWeight: 'medium', cursor: isCreditCard(expense) ? 'default' : 'pointer' }}
                             onDoubleClick={(e) => {
+                              if (isCreditCard(expense)) return; // No permitir edición de TCs
                               e.stopPropagation();
                               handleCellDoubleClick(expense, 'importe');
                             }}
                           >
-                            {editingCell?.id === expense.id && editingCell?.field === 'importe' ? (
+                            {editingCell?.id === expense.id && editingCell?.field === 'importe' && !isCreditCard(expense) ? (
                               <TextField
                                 value={editValue}
                                 onChange={handleInputChange}
@@ -1177,13 +1232,27 @@ export const ExpenseTable = ({ expenses, categories, onEdit, onUpdate, onDelete,
                                 variant="standard"
                                 sx={{ maxWidth: 100 }}
                               />
-                            ) : expense.importe > 0 ? (
-                              <span style={{ color: expense.currency === 'USD' ? '#00897b' : 'inherit', fontWeight: expense.currency === 'USD' ? 600 : 'inherit' }}>
-                                {formatCurrency(expense.importe, expense.currency)}
-                              </span>
-                            ) : (
-                              expense.status === 'bonificado' ? 'Bonificado' : '$ 0,00'
-                            )}
+                            ) : (() => {
+                              // Para TCs, calcular y mostrar el importe automático
+                              const displayImporte = isCreditCard(expense) ? calculateCardImporte(expense) : expense.importe;
+
+                              if (displayImporte > 0) {
+                                return (
+                                  <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 0.5 }}>
+                                    <span style={{ color: expense.currency === 'USD' ? '#00897b' : 'inherit', fontWeight: expense.currency === 'USD' ? 600 : 'inherit' }}>
+                                      {formatCurrency(displayImporte, expense.currency)}
+                                    </span>
+                                    {isCreditCard(expense) && (
+                                      <Tooltip title="Importe calculado automáticamente" arrow>
+                                        <MuiIcons.AutoMode sx={{ fontSize: 14, color: 'primary.main', opacity: 0.7 }} />
+                                      </Tooltip>
+                                    )}
+                                  </Box>
+                                );
+                              } else {
+                                return expense.status === 'bonificado' ? 'Bonificado' : '$ 0,00';
+                              }
+                            })()}
                           </TableCell>
                           <TableCell
                             sx={{ cursor: 'pointer' }}
@@ -1236,79 +1305,84 @@ export const ExpenseTable = ({ expenses, categories, onEdit, onUpdate, onDelete,
                               </Box>
 
                               {/* Indicador de gasto asociado a TC */}
-                              {expense.linkedToCardId && (
-                                <Tooltip title="Clic para desasociar de TC" arrow>
-                                  <CreditCardIcon
-                                    fontSize="small"
-                                    sx={{
-                                      color: '#7c3aed',
-                                      cursor: 'pointer'
-                                    }}
-                                    onClick={() => handleUnlinkFromCard(expense)}
-                                  />
-                                </Tooltip>
-                              )}
+                              {expense.linkedToCardId && (() => {
+                                const linkedCard = expenses.find(exp => exp.id === expense.linkedToCardId);
+                                const cardName = linkedCard?.item || 'TC';
+                                return (
+                                  <Tooltip title={`Clic para desasociar de ${cardName}`} arrow>
+                                    <CreditCardIcon
+                                      fontSize="small"
+                                      sx={{
+                                        color: '#7c3aed',
+                                        cursor: 'pointer'
+                                      }}
+                                      onClick={() => handleUnlinkFromCard(expense)}
+                                    />
+                                  </Tooltip>
+                                );
+                              })()}
                             </Box>
                           </TableCell>
                           <TableCell align="center">
-                            {/* Ícono para asociar gastos a TC */}
-                            {isCreditCard(expense) && (
-                              <Tooltip
-                                title={`Asociar gastos (${getLinkedExpenses(expense.id || '', expenses).length})`}
-                                arrow
-                              >
-                                <IconButton
-                                  size="small"
-                                  onClick={() => handleOpenCardLinkDialog(expense)}
-                                  color={getLinkedExpenses(expense.id || '', expenses).length > 0 ? 'primary' : 'default'}
-                                  sx={{ mr: 0.5 }}
+                            <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 0.5, minWidth: 200 }}>
+                              {/* Ícono para asociar gastos a TC con placeholder */}
+                              {isCreditCard(expense) ? (
+                                <Tooltip
+                                  title={`Detalle (${getLinkedExpenses(expense.id || '', expenses).length})`}
+                                  arrow
                                 >
-                                  <LinkIcon fontSize="small" />
-                                </IconButton>
+                                  <IconButton
+                                    size="small"
+                                    onClick={() => handleOpenCardLinkDialog(expense)}
+                                    color={getLinkedExpenses(expense.id || '', expenses).length > 0 ? 'primary' : 'default'}
+                                  >
+                                    <LinkIcon fontSize="small" />
+                                  </IconButton>
+                                </Tooltip>
+                              ) : (
+                                <Box sx={{ width: 34 }} /> // Placeholder para mantener alineación
+                              )}
+                              <Tooltip title={expense.comment || ''} arrow>
+                                <span>
+                                  <IconButton
+                                    size="small"
+                                    onClick={() => handleOpenCommentDialog(expense)}
+                                    color={expense.comment ? 'info' : 'default'}
+                                    sx={{ opacity: expense.comment ? 1 : 0.5 }}
+                                  >
+                                    {expense.comment ? <VisibilityIcon fontSize="small" /> : <VisibilityOffIcon fontSize="small" />}
+                                  </IconButton>
+                                </span>
                               </Tooltip>
-                            )}
-                            <Tooltip title={expense.comment || ''} arrow>
-                              <span>
-                                <IconButton
-                                  size="small"
-                                  onClick={() => handleOpenCommentDialog(expense)}
-                                  color={expense.comment ? 'info' : 'default'}
-                                  sx={{ mr: 0.5, opacity: expense.comment ? 1 : 0.5 }}
-                                >
-                                  {expense.comment ? <VisibilityIcon fontSize="small" /> : <VisibilityOffIcon fontSize="small" />}
-                                </IconButton>
-                              </span>
-                            </Tooltip>
-                            <Tooltip title={expense.debt ? `Deuda: $${expense.debt.toLocaleString('es-AR')}` : ''} arrow>
-                              <span>
-                                <IconButton
-                                  size="small"
-                                  onClick={() => handleOpenDebtDialog(expense)}
-                                  sx={{
-                                    mr: 0.5,
-                                    color: expense.debt ? '#ef4444' : '#9ca3af',
-                                    opacity: expense.debt ? 1 : 0.5
-                                  }}
-                                >
-                                  <MoneyOffIcon fontSize="small" />
-                                </IconButton>
-                              </span>
-                            </Tooltip>
-                            <IconButton
-                              size="small"
-                              onClick={() => onEdit(expense)}
-                              color="primary"
-                              sx={{ mr: 0.5 }}
-                            >
-                              <EditIcon fontSize="small" />
-                            </IconButton>
-                            <IconButton
-                              size="small"
-                              onClick={() => handleDeleteClick(expense)}
-                              color="error"
-                            >
-                              <DeleteIcon fontSize="small" />
-                            </IconButton>
+                              <Tooltip title={expense.debt ? `Deuda: $${expense.debt.toLocaleString('es-AR')}` : ''} arrow>
+                                <span>
+                                  <IconButton
+                                    size="small"
+                                    onClick={() => handleOpenDebtDialog(expense)}
+                                    sx={{
+                                      color: expense.debt ? '#ef4444' : '#9ca3af',
+                                      opacity: expense.debt ? 1 : 0.5
+                                    }}
+                                  >
+                                    <MoneyOffIcon fontSize="small" />
+                                  </IconButton>
+                                </span>
+                              </Tooltip>
+                              <IconButton
+                                size="small"
+                                onClick={() => onEdit(expense)}
+                                color="primary"
+                              >
+                                <EditIcon fontSize="small" />
+                              </IconButton>
+                              <IconButton
+                                size="small"
+                                onClick={() => handleDeleteClick(expense)}
+                                color="error"
+                              >
+                                <DeleteIcon fontSize="small" />
+                              </IconButton>
+                            </Box>
                           </TableCell>
                         </SortableRow>
                       ))
@@ -1377,37 +1451,37 @@ export const ExpenseTable = ({ expenses, categories, onEdit, onUpdate, onDelete,
                         </TableCell>
                         <TableCell colSpan={2} align="right">
                           <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
-                            {totalARS > 0 && totalUSD > 0 ? (
+                            {subtotalARS > 0 && subtotalUSD > 0 ? (
                               // Cuando hay ambas monedas, mostrar con separador
                               <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 1.5 }}>
                                 <Typography variant="body2" fontWeight="bold">
-                                  $ {totalARS.toLocaleString('es-AR', { minimumFractionDigits: 2 })}
+                                  $ {subtotalARS.toLocaleString('es-AR', { minimumFractionDigits: 2 })}
                                 </Typography>
                                 <Typography variant="body2" sx={{ opacity: 0.4, fontWeight: 'bold' }}>
                                   •
                                 </Typography>
                                 <Typography variant="body2" fontWeight="bold" sx={{ color: '#00897b' }}>
-                                  USD {totalUSD.toLocaleString('es-AR', { minimumFractionDigits: 2 })}
+                                  USD {subtotalUSD.toLocaleString('es-AR', { minimumFractionDigits: 2 })}
                                 </Typography>
                               </Box>
                             ) : (
                               // Cuando hay solo una moneda
                               <>
-                                {totalARS > 0 && (
+                                {subtotalARS > 0 && (
                                   <Typography variant="body2" fontWeight="bold">
-                                    $ {totalARS.toLocaleString('es-AR', { minimumFractionDigits: 2 })}
+                                    $ {subtotalARS.toLocaleString('es-AR', { minimumFractionDigits: 2 })}
                                   </Typography>
                                 )}
-                                {totalUSD > 0 && (
+                                {subtotalUSD > 0 && (
                                   <Typography variant="body2" fontWeight="bold" sx={{ color: '#00897b' }}>
-                                    USD {totalUSD.toLocaleString('es-AR', { minimumFractionDigits: 2 })}
+                                    USD {subtotalUSD.toLocaleString('es-AR', { minimumFractionDigits: 2 })}
                                   </Typography>
                                 )}
                               </>
                             )}
-                            {totalUSD > 0 && (
+                            {subtotalUSD > 0 && (
                               <Typography variant="caption" color="text.secondary" sx={{ display: 'block', fontStyle: 'italic' }}>
-                                Total: $ {totalInARS.toLocaleString('es-AR', { minimumFractionDigits: 2 })}
+                                Total: $ {(subtotalARS + (subtotalUSD * usdRate)).toLocaleString('es-AR', { minimumFractionDigits: 2 })}
                               </Typography>
                             )}
                           </Box>
@@ -1703,6 +1777,9 @@ export const ExpenseTable = ({ expenses, categories, onEdit, onUpdate, onDelete,
           setSelectedCreditCard(null);
         }}
         onSave={handleSaveCardLinks}
+        onUpdateCard={async (updatedCard) => {
+          await onUpdate(updatedCard, undefined, true);
+        }}
       />
 
       {/* Dialog de confirmación para desasociar gasto */}
