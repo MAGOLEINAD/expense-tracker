@@ -23,6 +23,8 @@ import {
   CircularProgress,
   Menu,
   MenuItem,
+  useTheme,
+  useMediaQuery,
 } from '@mui/material';
 import { DndContext, useSensor, useSensors, PointerSensor, useDroppable, DragOverlay, closestCenter } from '@dnd-kit/core';
 import type { DragEndEvent, DragStartEvent } from '@dnd-kit/core';
@@ -54,6 +56,8 @@ import { useStatusColors } from '@/hooks/useStatusColors';
 import { CommentDialog } from './CommentDialog';
 import { DebtDialog } from './DebtDialog';
 import { CardLinkDialog } from './CardLinkDialog';
+import { ExpenseTableMobile } from './ExpenseTableMobile';
+import { ExpenseDetailDialog } from './ExpenseDetailDialog';
 import * as MuiIcons from '@mui/icons-material';
 import { useSnackbar } from 'notistack';
 import { formatDateInput, isCreditCard, getLinkedExpenses } from '@/utils';
@@ -129,6 +133,8 @@ export const ExpenseTable = ({ expenses, categories, onEdit, onUpdate, onDelete,
   const { updateCategoryColors, toggleIncludeInTotals } = useCategories(user?.uid);
   const { getStatusColor } = useStatusColors();
   const { enqueueSnackbar } = useSnackbar();
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('sm')); // < 768px
   const [usdRate, setUsdRate] = useState<number>(1200);
 
   // Función helper para calcular el importe de una TC
@@ -178,6 +184,7 @@ export const ExpenseTable = ({ expenses, categories, onEdit, onUpdate, onDelete,
   const [commentDialogOpen, setCommentDialogOpen] = useState(false);
   const [debtDialogOpen, setDebtDialogOpen] = useState(false);
   const [selectedExpense, setSelectedExpense] = useState<Expense | null>(null);
+  const [detailDialogOpen, setDetailDialogOpen] = useState(false);
   const [cardLinkDialogOpen, setCardLinkDialogOpen] = useState(false);
   const [selectedCreditCard, setSelectedCreditCard] = useState<Expense | null>(null);
   const [unlinkConfirmDialogOpen, setUnlinkConfirmDialogOpen] = useState(false);
@@ -456,6 +463,11 @@ export const ExpenseTable = ({ expenses, categories, onEdit, onUpdate, onDelete,
     } catch (error) {
       console.error('Error saving debt:', error);
     }
+  };
+
+  const handleOpenDetail = (expense: Expense) => {
+    setSelectedExpense(expense);
+    setDetailDialogOpen(true);
   };
 
   const handleOpenCardLinkDialog = (creditCardExpense: Expense) => {
@@ -854,14 +866,40 @@ export const ExpenseTable = ({ expenses, categories, onEdit, onUpdate, onDelete,
   };
 
   return (
-    <DndContext
-      sensors={sensors}
-      collisionDetection={closestCenter}
-      onDragStart={handleDragStart}
-      onDragEnd={handleDragEnd}
-    >
-      <Box>
-      {categoryTotals.length === 0 ? (
+    <Box>
+      {isMobile ? (
+        // Vista mobile con lista compacta
+        <ExpenseTableMobile
+          categoryTotals={categoryTotals}
+          expandedCategories={expandedCategories}
+          onToggleCategory={toggleCategory}
+          onOpenDetail={handleOpenDetail}
+          getCategoryIcon={getCategoryIcon}
+          getCategoryColor={getCategoryColor}
+          usdRate={usdRate}
+          categories={categories}
+          includedCategories={includedCategories}
+          excludedCategories={excludedCategories}
+          grandTotalARS={grandTotalARS}
+          grandTotalUSD={grandTotalUSD}
+          grandTotalInARS={grandTotalInARS}
+          excludedTotalARS={excludedTotalARS}
+          excludedTotalUSD={excludedTotalUSD}
+          excludedTotalInARS={excludedTotalInARS}
+          totalDebt={totalDebt}
+          linkedTotalInARS={linkedTotalInARS}
+          calculateCardImporte={calculateCardImporte}
+        />
+      ) : (
+        // Vista desktop con tabla y drag & drop
+        <DndContext
+          sensors={sensors}
+          collisionDetection={closestCenter}
+          onDragStart={handleDragStart}
+          onDragEnd={handleDragEnd}
+        >
+          <Box>
+          {categoryTotals.length === 0 ? (
         <Paper
           elevation={1}
           sx={{
@@ -2012,7 +2050,56 @@ export const ExpenseTable = ({ expenses, categories, onEdit, onUpdate, onDelete,
           </MenuItem>
         ))}
       </Menu>
+          </Box>
+        </DndContext>
+      )}
+
+      {/* Dialog de detalle para mobile */}
+      {isMobile && (
+        <ExpenseDetailDialog
+          open={detailDialogOpen}
+          expense={selectedExpense}
+          categories={categories}
+          allExpenses={expenses}
+          onClose={() => setDetailDialogOpen(false)}
+          onEdit={(exp) => {
+            setDetailDialogOpen(false);
+            onEdit(exp);
+          }}
+          onDelete={(exp) => {
+            setDetailDialogOpen(false);
+            if (exp.id) {
+              // Verificar si es TC con gastos asociados
+              if (isCreditCard(exp)) {
+                const linkedExpenses = getLinkedExpenses(exp.id, expenses);
+                if (linkedExpenses.length > 0) {
+                  setExpenseToDelete(exp);
+                  setDeleteWarningDialogOpen(true);
+                  return;
+                }
+              }
+              onDelete(exp.id);
+            }
+          }}
+          onOpenComment={handleOpenCommentDialog}
+          onOpenDebt={handleOpenDebtDialog}
+          onOpenCardLink={handleOpenCardLinkDialog}
+          onUnlinkFromCard={(exp) => {
+            setExpenseToUnlink(exp);
+            setUnlinkConfirmDialogOpen(true);
+          }}
+          onStatusChange={(exp, newStatus) => {
+            const updatedExpense = { ...exp, status: newStatus };
+            onUpdate(updatedExpense, exp);
+          }}
+          statusColors={
+            Object.fromEntries(
+              STATUS_OPTIONS.map(status => [status, getStatusColor(status).bgcolor || '#000'])
+            ) as Record<PaymentStatus, string>
+          }
+          usdRate={usdRate}
+        />
+      )}
     </Box>
-    </DndContext>
   );
 };

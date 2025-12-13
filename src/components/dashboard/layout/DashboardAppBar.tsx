@@ -1,12 +1,16 @@
-import { AppBar, Toolbar, IconButton, Box, Typography, Button } from '@mui/material';
+import { AppBar, Toolbar, IconButton, Box, Typography, Button, Chip, Stack } from '@mui/material';
 import MenuIcon from '@mui/icons-material/Menu';
 import AddIcon from '@mui/icons-material/Add';
 import ContentCopyIcon from '@mui/icons-material/ContentCopy';
+import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
+import ChevronRightIcon from '@mui/icons-material/ChevronRight';
+import CalendarMonthIcon from '@mui/icons-material/CalendarMonth';
 import type { User } from 'firebase/auth';
 import { UsdRateDisplay } from '../info/UsdRateDisplay';
 import { MonthNavigator } from '../navigation/MonthNavigator';
 import { TabSwitcher } from '../navigation/TabSwitcher';
 import { UserMenu } from '../menus/UserMenu';
+import { MONTHS } from '@/utils';
 
 interface DashboardAppBarProps {
   isMobile: boolean;
@@ -63,34 +67,111 @@ export const DashboardAppBar = ({
         background: 'linear-gradient(135deg, #0288d1 0%, #01579b 100%)',
       }}
     >
-      <Toolbar sx={{ minHeight: 56, gap: 2, px: 3 }}>
+      <Toolbar
+        sx={{
+          minHeight: isMobile ? 56 : 56,
+          gap: 1,
+          px: 2,
+        }}
+      >
         {/* Mobile Layout */}
         {isMobile && (
           <>
+            {/* Izquierda: Menu hamburguesa */}
             <IconButton
               edge="start"
               color="inherit"
               onClick={onOpenMobileDrawer}
-              sx={{ mr: 1 }}
+              sx={{
+                width: 44,
+                height: 44,
+              }}
             >
               <MenuIcon />
             </IconButton>
 
-            <Typography variant="subtitle1" sx={{ fontWeight: 700, flexGrow: 1 }}>
-              💰 Gastos
-            </Typography>
+            {/* Centro: Controles de mes (centrados con position absolute) */}
+            <Box
+              sx={{
+                position: 'absolute',
+                left: '50%',
+                transform: 'translateX(-50%)',
+                display: 'flex',
+                alignItems: 'center',
+                gap: 0.5,
+              }}
+            >
+              <IconButton
+                onClick={onPreviousMonth}
+                sx={{
+                  color: 'white',
+                  width: 44,
+                  height: 44,
+                  '&:active': {
+                    bgcolor: 'rgba(255, 255, 255, 0.15)',
+                  },
+                }}
+              >
+                <ChevronLeftIcon fontSize="medium" />
+              </IconButton>
 
-            <UserMenu
-              user={user}
-              open={Boolean(userMenuAnchor)}
-              anchorEl={userMenuAnchor}
-              onOpenMenu={onOpenUserMenu}
-              onCloseMenu={onCloseUserMenu}
-              onOpenSettings={onOpenSettings}
-              onOpenStatusColors={onOpenStatusColors}
-              onLogout={onLogout}
-              size="small"
-            />
+              <Chip
+                icon={<CalendarMonthIcon sx={{ fontSize: 18 }} />}
+                label={
+                  <Typography variant="body2" fontWeight={600}>
+                    {MONTHS[selectedMonth - 1]} {selectedYear}
+                  </Typography>
+                }
+                onClick={onOpenDatePicker}
+                sx={{
+                  bgcolor: 'rgba(255, 255, 255, 0.25)',
+                  color: 'white',
+                  px: 1.5,
+                  height: 36,
+                  cursor: 'pointer',
+                  backdropFilter: 'blur(10px)',
+                  '&:hover': {
+                    bgcolor: 'rgba(255, 255, 255, 0.35)',
+                  },
+                  '&:active': {
+                    bgcolor: 'rgba(255, 255, 255, 0.4)',
+                  },
+                  '& .MuiChip-icon': {
+                    color: 'white',
+                  },
+                  transition: 'all 0.2s',
+                }}
+              />
+
+              <IconButton
+                onClick={onNextMonth}
+                sx={{
+                  color: 'white',
+                  width: 44,
+                  height: 44,
+                  '&:active': {
+                    bgcolor: 'rgba(255, 255, 255, 0.15)',
+                  },
+                }}
+              >
+                <ChevronRightIcon fontSize="medium" />
+              </IconButton>
+            </Box>
+
+            {/* Derecha: Avatar (con margin-left auto para empujar a la derecha) */}
+            <Box sx={{ ml: 'auto' }}>
+              <UserMenu
+                user={user}
+                open={Boolean(userMenuAnchor)}
+                anchorEl={userMenuAnchor}
+                onOpenMenu={onOpenUserMenu}
+                onCloseMenu={onCloseUserMenu}
+                onOpenSettings={onOpenSettings}
+                onOpenStatusColors={onOpenStatusColors}
+                onLogout={onLogout}
+                size="small"
+              />
+            </Box>
           </>
         )}
 

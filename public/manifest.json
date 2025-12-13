@@ -1,0 +1,26 @@
+{
+  "name": "Administrador de Gastos - LEINAD",
+  "short_name": "Gastos",
+  "description": "Aplicación para gestionar gastos mensuales",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#0288d1",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "/iconoMobile1.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/iconoMobile2.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "categories": ["finance", "productivity"],
+  "screenshots": []
+}

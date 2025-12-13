@@ -1,8 +1,7 @@
-import { Stack, IconButton, Box, Typography, Button } from '@mui/material';
+import { Stack, IconButton, Chip, Typography } from '@mui/material';
 import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
 import ChevronRightIcon from '@mui/icons-material/ChevronRight';
-import AddIcon from '@mui/icons-material/Add';
-import ContentCopyIcon from '@mui/icons-material/ContentCopy';
+import CalendarMonthIcon from '@mui/icons-material/CalendarMonth';
 import { MONTHS } from '@/utils';
 
 interface MobileDateControlsProps {
@@ -11,8 +10,6 @@ interface MobileDateControlsProps {
   onPreviousMonth: () => void;
   onNextMonth: () => void;
   onOpenDatePicker: (event: React.MouseEvent<HTMLElement>) => void;
-  onOpenExpenseDialog: () => void;
-  onOpenTemplate: () => void;
 }
 
 export const MobileDateControls = ({
@@ -21,76 +18,68 @@ export const MobileDateControls = ({
   onPreviousMonth,
   onNextMonth,
   onOpenDatePicker,
-  onOpenExpenseDialog,
-  onOpenTemplate,
 }: MobileDateControlsProps) => {
   return (
-    <>
-      <Stack
-        direction="row"
-        spacing={1}
-        alignItems="center"
+    <Stack
+      direction="row"
+      spacing={1}
+      alignItems="center"
+      justifyContent="center"
+      sx={{
+        bgcolor: 'background.paper',
+        py: 1,
+        px: 1.5,
+        borderRadius: 3,
+        mb: 2,
+        boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
+      }}
+    >
+      <IconButton
+        onClick={onPreviousMonth}
+        size="small"
         sx={{
-          bgcolor: 'background.paper',
-          p: 1,
-          borderRadius: 2,
-          mb: 1.5,
-          boxShadow: 1,
+          color: 'primary.main',
+          '&:hover': { bgcolor: 'primary.lighter' }
         }}
       >
-        <IconButton onClick={onPreviousMonth} size="small" color="primary">
-          <ChevronLeftIcon />
-        </IconButton>
+        <ChevronLeftIcon />
+      </IconButton>
 
-        <Box
-          onClick={onOpenDatePicker}
-          sx={{
-            px: 2,
-            py: 0.5,
-            bgcolor: 'primary.main',
-            color: 'white',
-            borderRadius: 1.5,
-            minWidth: 140,
-            textAlign: 'center',
-            cursor: 'pointer',
-            '&:hover': {
-              bgcolor: 'primary.dark',
-            },
-            transition: 'background-color 0.2s',
-          }}
-        >
-          <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>
+      <Chip
+        icon={<CalendarMonthIcon sx={{ fontSize: 18 }} />}
+        label={
+          <Typography variant="body2" fontWeight={600}>
             {MONTHS[selectedMonth - 1]} {selectedYear}
           </Typography>
-        </Box>
+        }
+        onClick={onOpenDatePicker}
+        sx={{
+          bgcolor: 'primary.main',
+          color: 'white',
+          px: 1.5,
+          height: 36,
+          cursor: 'pointer',
+          '&:hover': {
+            bgcolor: 'primary.dark',
+          },
+          '& .MuiChip-icon': {
+            color: 'white',
+          },
+          transition: 'all 0.2s',
+          boxShadow: '0 2px 4px rgba(2, 136, 209, 0.3)',
+        }}
+      />
 
-        <IconButton onClick={onNextMonth} size="small" color="primary">
-          <ChevronRightIcon />
-        </IconButton>
-
-        <Box sx={{ flexGrow: 1 }} />
-
-        <Button
-          variant="contained"
-          startIcon={<AddIcon />}
-          onClick={onOpenExpenseDialog}
-          size="small"
-          sx={{ textTransform: 'none', fontWeight: 600 }}
-        >
-          Nuevo
-        </Button>
-      </Stack>
-
-      <Button
-        variant="outlined"
-        startIcon={<ContentCopyIcon />}
-        onClick={onOpenTemplate}
-        fullWidth
+      <IconButton
+        onClick={onNextMonth}
         size="small"
-        sx={{ mb: 1.5, textTransform: 'none' }}
+        sx={{
+          color: 'primary.main',
+          '&:hover': { bgcolor: 'primary.lighter' }
+        }}
       >
-        Aplicar Template
-      </Button>
-    </>
+        <ChevronRightIcon />
+      </IconButton>
+    </Stack>
   );
 };

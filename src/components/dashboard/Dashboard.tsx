@@ -1,10 +1,12 @@
 import { useState, useEffect } from 'react';
-import { Container, Box, CircularProgress, useMediaQuery, useTheme } from '@mui/material';
+import { Container, Box, CircularProgress, useMediaQuery, useTheme, Fab } from '@mui/material';
+import AddIcon from '@mui/icons-material/Add';
 import { useSnackbar } from 'notistack';
 import { useAuth } from '@/contexts/AuthContext';
 import { useExpenses } from '@/hooks/useExpenses';
 import { useCategories } from '@/hooks/useCategories';
 import { useStatusColors } from '@/hooks/useStatusColors';
+import { useSwipe } from '@/hooks/useSwipe';
 import { ExpenseDialog } from '@/components/expenses/ExpenseDialog';
 import { ExpenseTable } from '@/components/expenses/ExpenseTable';
 import { Charts } from '@/components/charts/Charts';
@@ -12,7 +14,7 @@ import { ConfirmDialog } from '@/components/common/ConfirmDialog';
 import { CategoryManager } from '@/components/categories/CategoryManager';
 import { DashboardAppBar } from './layout/DashboardAppBar';
 import { MobileDrawer } from './layout/MobileDrawer';
-import { MobileDateControls } from './layout/MobileDateControls';
+import { Footer } from './layout/Footer';
 import { DatePickerPopover } from './navigation/DatePickerPopover';
 import { UsdRatePopover } from './info/UsdRatePopover';
 import { TemplateDialog } from './dialogs/TemplateDialog';
@@ -66,6 +68,19 @@ export const Dashboard = () => {
 
   const { categories } = useCategories(user?.uid);
   const { colors: statusColors, saveColors } = useStatusColors();
+
+  // Swipe gestures for month navigation (mobile only)
+  const swipeRef = useSwipe<HTMLDivElement>({
+    onSwipeLeft: () => {
+      if (isMobile) handleNextMonth();
+    },
+    onSwipeRight: () => {
+      if (isMobile) handlePreviousMonth();
+    },
+  }, {
+    minSwipeDistance: 50,
+    preventScroll: false,
+  });
 
   // Fetch USD rate
   useEffect(() => {
@@ -252,6 +267,7 @@ export const Dashboard = () => {
         activeTab={activeTab}
         onClose={() => setMobileDrawerOpen(false)}
         onSelectTab={(tab) => setActiveTab(tab)}
+        onOpenTemplate={() => setTemplateDialogOpen(true)}
       />
 
       <DatePickerPopover
@@ -272,22 +288,15 @@ export const Dashboard = () => {
         onClose={() => setUsdPopoverAnchor(null)}
       />
 
-      <Container maxWidth="xl" sx={{ py: isMobile ? 1 : 1.5, px: isMobile ? 1 : 2 }}>
-
-
-
-        {isMobile && (
-          <MobileDateControls
-            selectedMonth={selectedMonth}
-            selectedYear={selectedYear}
-            onPreviousMonth={handlePreviousMonth}
-            onNextMonth={handleNextMonth}
-            onOpenDatePicker={(e) => setDatePickerAnchor(e.currentTarget)}
-            onOpenExpenseDialog={handleOpenDialog}
-            onOpenTemplate={() => setTemplateDialogOpen(true)}
-          />
-        )}
-
+      <Container
+        ref={swipeRef}
+        maxWidth="xl"
+        sx={{
+          py: isMobile ? 1 : 1.5,
+          px: isMobile ? 1 : 2,
+          pb: isMobile ? 2 : 1.5, // El footer ya proporciona espacio suficiente
+        }}
+      >
         {loading ? (
           <Box sx={{ display: 'flex', justifyContent: 'center', py: 8 }}>
             <CircularProgress />
@@ -295,22 +304,28 @@ export const Dashboard = () => {
         ) : (
           <>
             {activeTab === 0 && (
-              <ExpenseTable
-                expenses={expenses}
-                categories={categories}
-                onEdit={handleEdit}
-                onUpdate={handleUpdate}
-                onDelete={handleDelete}
-                onDeleteMultiple={handleDeleteMultiple}
-                onAdd={addExpense}
-                linkExpensesToCard={linkExpensesToCard}
-                unlinkExpensesFromCard={unlinkExpensesFromCard}
-                selectedMonth={selectedMonth}
-                selectedYear={selectedYear}
-              />
+              <>
+                <ExpenseTable
+                  expenses={expenses}
+                  categories={categories}
+                  onEdit={handleEdit}
+                  onUpdate={handleUpdate}
+                  onDelete={handleDelete}
+                  onDeleteMultiple={handleDeleteMultiple}
+                  onAdd={addExpense}
+                  linkExpensesToCard={linkExpensesToCard}
+                  unlinkExpensesFromCard={unlinkExpensesFromCard}
+                  selectedMonth={selectedMonth}
+                  selectedYear={selectedYear}
+                />
+                {isMobile && <Footer />}
+              </>
             )}
             {activeTab === 1 && (
-              <Charts allExpenses={allExpenses} currentYear={selectedYear} currentMonth={selectedMonth} categories={categories} />
+              <>
+                <Charts allExpenses={allExpenses} currentYear={selectedYear} currentMonth={selectedMonth} categories={categories} />
+                {isMobile && <Footer />}
+              </>
             )}
           </>
         )}
@@ -366,6 +381,28 @@ export const Dashboard = () => {
         onSave={handleSaveStatusColors}
         currentColors={statusColors}
       />
+
+      {/* FAB para Nuevo Gasto (solo mobile) */}
+      {isMobile && (
+        <Fab
+          color="primary"
+          aria-label="nuevo gasto"
+          onClick={handleOpenDialog}
+          sx={{
+            position: 'fixed',
+            bottom: 24,
+            right: 24,
+            boxShadow: '0 6px 20px rgba(2, 136, 209, 0.4)',
+            '&:hover': {
+              transform: 'scale(1.1)',
+              boxShadow: '0 8px 24px rgba(2, 136, 209, 0.5)',
+            },
+            transition: 'all 0.2s ease-in-out',
+          }}
+        >
+          <AddIcon />
+        </Fab>
+      )}
     </>
   );
 };
