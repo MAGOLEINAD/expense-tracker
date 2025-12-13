@@ -1,9 +1,9 @@
-import { Box, Collapse, List, ListItem, ListItemIcon, ListItemText, Paper, Stack, Typography, Icon as MuiIcon, Chip } from '@mui/material';
+import { Box, Collapse, List, ListItem, ListItemIcon, ListItemText, Paper, Stack, Typography, Chip } from '@mui/material';
 import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import ExpandLessIcon from '@mui/icons-material/ExpandLess';
 import * as MuiIcons from '@mui/icons-material';
 import type { Expense, UserCategory } from '@/types';
-import { formatCurrency as formatCurrencyUtil, isCreditCard, getLinkedExpenses } from '@/utils';
+import { isCreditCard, getLinkedExpenses } from '@/utils';
 
 interface CategoryTotal {
   categoryId: string;
@@ -25,11 +25,9 @@ interface ExpenseTableMobileProps {
   expandedCategories: Set<string>;
   onToggleCategory: (categoryId: string) => void;
   onOpenDetail: (expense: Expense) => void;
-  getCategoryIcon: (category: UserCategory | undefined, index: number) => JSX.Element;
+  getCategoryIcon: (category: UserCategory | undefined, index: number) => React.JSX.Element;
   getCategoryColor: (category: UserCategory | undefined, index: number) => { from: string; to: string };
-  usdRate: number;
   categories: UserCategory[];
-  includedCategories: CategoryTotal[];
   excludedCategories: CategoryTotal[];
   grandTotalARS: number;
   grandTotalUSD: number;
@@ -58,9 +56,7 @@ export const ExpenseTableMobile = ({
   onOpenDetail,
   getCategoryIcon,
   getCategoryColor,
-  usdRate,
   categories,
-  includedCategories,
   excludedCategories,
   grandTotalARS,
   grandTotalUSD,
@@ -74,11 +70,11 @@ export const ExpenseTableMobile = ({
 }: ExpenseTableMobileProps) => {
 
   // Función helper para obtener el ícono del gasto
-  const getExpenseIcon = (expense: Expense, categoryIcon: JSX.Element, categoryIndex: number) => {
+  const getExpenseIcon = (expense: Expense, categoryIcon: React.JSX.Element, _categoryIndex: number) => {
     if (expense.icon) {
       const IconComponent = (MuiIcons as any)[expense.icon];
       if (IconComponent) {
-        return <IconComponent sx={{ color: expense.iconColor || 'action.active', fontSize: 20 }} />;
+        return <IconComponent sx={{ color: expense.iconColor || '#2196f3', fontSize: 20 }} />;
       }
     }
     return categoryIcon;

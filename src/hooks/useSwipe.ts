@@ -1,4 +1,4 @@
-import { useRef, useEffect, RefObject } from 'react';
+import { useRef, useEffect, type RefObject } from 'react';
 
 interface SwipeCallbacks {
   onSwipeLeft?: () => void;
@@ -21,7 +21,7 @@ interface SwipeConfig {
 export const useSwipe = <T extends HTMLElement = HTMLDivElement>(
   callbacks: SwipeCallbacks,
   config: SwipeConfig = {}
-): RefObject<T> => {
+): RefObject<T | null> => {
   const {
     minSwipeDistance = 50,
     preventScroll = false,
