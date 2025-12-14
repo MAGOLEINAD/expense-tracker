@@ -1,3 +1,5 @@
+/* eslint-disable no-restricted-globals */
+
 const CACHE_VERSION = 'v2';
 const STATIC_CACHE = `gastos-static-${CACHE_VERSION}`;
 const RUNTIME_CACHE = `gastos-runtime-${CACHE_VERSION}`;
@@ -12,9 +14,7 @@ const APP_SHELL = [
 
 // Install: cache app shell
 self.addEventListener('install', (event) => {
-  event.waitUntil(
-    caches.open(STATIC_CACHE).then((cache) => cache.addAll(APP_SHELL))
-  );
+  event.waitUntil(caches.open(STATIC_CACHE).then((cache) => cache.addAll(APP_SHELL)));
   self.skipWaiting();
 });
 
@@ -35,31 +35,24 @@ self.addEventListener('activate', (event) => {
 self.addEventListener('fetch', (event) => {
   const { request } = event;
 
-  // Only handle GET
   if (request.method !== 'GET') return;
+
+  // Avoid SW issues with ranged requests (rare, but safe)
+  if (request.headers.has('range')) return;
 
   const url = new URL(request.url);
 
-  // 1) Navigation requests: fallback to index.html (offline-friendly SPA)
+  // 1) SPA navigation: network -> fallback to index
   if (request.mode === 'navigate') {
-    event.respondWith(
-      fetch(request)
-        .then((res) => res)
-        .catch(() => caches.match('/index.html'))
-    );
+    event.respondWith(fetch(request).catch(() => caches.match('/index.html')));
     return;
   }
 
-  // 2) Avoid caching calls to analytics or external domains if you want
-  // (Optional: keep it simple; only cache same-origin)
+  // 2) Only cache same-origin
   const isSameOrigin = url.origin === self.location.origin;
-  if (!isSameOrigin) {
-    // Let the network handle third-party requests
-    return;
-  }
+  if (!isSameOrigin) return;
 
-  // 3) If you use Firebase/Firestore REST calls through your app origin, treat as network-first.
-  // If you're calling googleapis domains directly, those are not same-origin and will skip caching above.
+  // 3) API calls: network-first
   const isApiCall =
     url.pathname.startsWith('/api/') ||
     url.pathname.startsWith('/__/') ||
@@ -83,7 +76,7 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  // 5) Default: cache-first fallback
+  // 5) Default
   event.respondWith(cacheFirst(request));
 });
 
@@ -92,6 +85,8 @@ async function cacheFirst(request) {
   if (cached) return cached;
 
   const res = await fetch(request);
+  if (!res || res.status !== 200) return res;
+
   const cache = await caches.open(RUNTIME_CACHE);
   cache.put(request, res.clone());
   return res;
@@ -101,7 +96,9 @@ async function networkFirst(request) {
   const cache = await caches.open(RUNTIME_CACHE);
   try {
     const res = await fetch(request);
-    cache.put(request, res.clone());
+    if (res && res.status === 200) {
+      cache.put(request, res.clone());
+    }
     return res;
   } catch (err) {
     const cached = await cache.match(request);
@@ -116,7 +113,9 @@ async function staleWhileRevalidate(request) {
 
   const fetchPromise = fetch(request)
     .then((res) => {
-      cache.put(request, res.clone());
+      if (res && res.status === 200) {
+        cache.put(request, res.clone());
+      }
       return res;
     })
     .catch(() => null);
