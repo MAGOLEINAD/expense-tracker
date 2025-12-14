@@ -6,7 +6,6 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useExpenses } from '@/hooks/useExpenses';
 import { useCategories } from '@/hooks/useCategories';
 import { useStatusColors } from '@/hooks/useStatusColors';
-import { useSwipe } from '@/hooks/useSwipe';
 import { ExpenseDialog } from '@/components/expenses/ExpenseDialog';
 import { ExpenseTable } from '@/components/expenses/ExpenseTable';
 import { Charts } from '@/components/charts/Charts';
@@ -68,19 +67,6 @@ export const Dashboard = () => {
 
   const { categories } = useCategories(user?.uid);
   const { colors: statusColors, saveColors } = useStatusColors();
-
-  // Swipe gestures for month navigation (mobile only)
-  const swipeRef = useSwipe<HTMLDivElement>({
-    onSwipeLeft: () => {
-      if (isMobile) handleNextMonth();
-    },
-    onSwipeRight: () => {
-      if (isMobile) handlePreviousMonth();
-    },
-  }, {
-    minSwipeDistance: 50,
-    preventScroll: false,
-  });
 
   // Fetch USD rate
   useEffect(() => {
@@ -289,7 +275,6 @@ export const Dashboard = () => {
       />
 
       <Container
-        ref={swipeRef}
         maxWidth="xl"
         sx={{
           py: isMobile ? 1 : 1.5,

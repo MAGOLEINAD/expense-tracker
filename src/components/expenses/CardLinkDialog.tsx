@@ -20,8 +20,11 @@ import {
   FormControlLabel,
   IconButton,
   Tooltip,
+  useTheme,
+  useMediaQuery,
 } from '@mui/material';
 import RefreshIcon from '@mui/icons-material/Refresh';
+import CloseIcon from '@mui/icons-material/Close';
 import type { Expense } from '@/types';
 import { isCreditCard, getLinkedExpenses } from '@/utils/formatters';
 import * as MuiIcons from '@mui/icons-material';
@@ -45,6 +48,8 @@ export const CardLinkDialog = ({
   onSave,
   onUpdateCard,
 }: CardLinkDialogProps) => {
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [saving, setSaving] = useState(false);
@@ -211,9 +216,20 @@ export const CardLinkDialog = ({
   if (!creditCardExpense) return null;
 
   return (
-    <Dialog open={open} onClose={onClose} maxWidth="md" fullWidth>
-      <DialogTitle>
+    <Dialog
+      open={open}
+      onClose={onClose}
+      maxWidth="md"
+      fullWidth
+      fullScreen={isMobile}
+    >
+      <DialogTitle sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         Restar Gastos - {creditCardExpense.item}
+        {isMobile && (
+          <IconButton edge="end" color="inherit" onClick={onClose} aria-label="cerrar">
+            <CloseIcon />
+          </IconButton>
+        )}
       </DialogTitle>
       <DialogContent>
         <Box sx={{ pt: 1 }}>
@@ -222,7 +238,12 @@ export const CardLinkDialog = ({
             <Typography variant="subtitle2" color="text.primary" sx={{ mb: 2, fontWeight: 600 }}>
               Totales de la Tarjeta
             </Typography>
-            <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 2 }}>
+            <Box sx={{
+              display: { xs: 'flex', sm: 'grid' },
+              flexDirection: { xs: 'column', sm: 'row' },
+              gridTemplateColumns: { sm: '1fr 1fr 1fr' },
+              gap: 2
+            }}>
               <TextField
                 label="Total ARS"
                 type="number"
@@ -283,7 +304,7 @@ export const CardLinkDialog = ({
           </Box>
 
           {/* Buscador y filtros */}
-          <Box sx={{ mb: 2, display: 'flex', gap: 2, alignItems: 'center', flexWrap: 'wrap' }}>
+          <Box sx={{ mb: 2, display: 'flex', gap: 2, alignItems: 'center', flexWrap: { xs: 'wrap', sm: 'nowrap' } }}>
             <TextField
               fullWidth
               size="small"

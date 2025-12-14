@@ -7,7 +7,11 @@ import {
   Button,
   TextField,
   Box,
+  IconButton,
+  useTheme,
+  useMediaQuery,
 } from '@mui/material';
+import CloseIcon from '@mui/icons-material/Close';
 
 interface CommentDialogProps {
   open: boolean;
@@ -18,6 +22,8 @@ interface CommentDialogProps {
 
 export const CommentDialog = ({ open, initialComment = '', onClose, onSave }: CommentDialogProps) => {
   const [comment, setComment] = useState(initialComment);
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
 
   useEffect(() => {
     setComment(initialComment);
@@ -34,9 +40,20 @@ export const CommentDialog = ({ open, initialComment = '', onClose, onSave }: Co
   };
 
   return (
-    <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
-      <DialogTitle>
+    <Dialog
+      open={open}
+      onClose={onClose}
+      maxWidth="sm"
+      fullWidth
+      fullScreen={isMobile}
+    >
+      <DialogTitle sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         {initialComment ? 'Editar Comentario' : 'Agregar Comentario'}
+        {isMobile && (
+          <IconButton edge="end" color="inherit" onClick={onClose} aria-label="cerrar">
+            <CloseIcon />
+          </IconButton>
+        )}
       </DialogTitle>
       <DialogContent>
         <Box sx={{ pt: 1 }}>

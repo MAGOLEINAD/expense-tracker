@@ -3,6 +3,7 @@
   "short_name": "Gastos",
   "description": "Aplicación para gestionar gastos mensuales",
   "start_url": "/",
+  "scope": "/",
   "display": "standalone",
   "background_color": "#ffffff",
   "theme_color": "#0288d1",
@@ -12,15 +13,28 @@
       "src": "/iconoMobile1.png",
       "sizes": "192x192",
       "type": "image/png",
-      "purpose": "any maskable"
+      "purpose": "any"
+    },
+    {
+      "src": "/iconoMobile1.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "maskable"
     },
     {
       "src": "/iconoMobile2.png",
       "sizes": "512x512",
       "type": "image/png",
-      "purpose": "any maskable"
+      "purpose": "any"
+    },
+    {
+      "src": "/iconoMobile2.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
     }
   ],
   "categories": ["finance", "productivity"],
-  "screenshots": []
+  "screenshots": [],
+  "prefer_related_applications": false
 }

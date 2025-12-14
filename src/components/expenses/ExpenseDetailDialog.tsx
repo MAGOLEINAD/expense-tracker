@@ -270,7 +270,10 @@ export const ExpenseDetailDialog = ({
                 startIcon={<CommentIcon />}
                 onClick={() => {
                   onClose();
-                  onOpenComment(expense);
+                  // Delay para que el DetailDialog se cierre completamente primero
+                  setTimeout(() => {
+                    onOpenComment(expense);
+                  }, 150);
                 }}
               >
                 {expense.comment ? 'Editar Comentario' : 'Agregar Comentario'}
@@ -282,7 +285,10 @@ export const ExpenseDetailDialog = ({
                 startIcon={<MoneyOffIcon />}
                 onClick={() => {
                   onClose();
-                  onOpenDebt(expense);
+                  // Delay para que el DetailDialog se cierre completamente primero
+                  setTimeout(() => {
+                    onOpenDebt(expense);
+                  }, 150);
                 }}
               >
                 {expense.debt && expense.debt > 0 ? 'Editar Deuda' : 'Agregar Deuda'}

@@ -9,8 +9,12 @@ import {
   Box,
   InputAdornment,
   Alert,
+  IconButton,
+  useTheme,
+  useMediaQuery,
 } from '@mui/material';
 import AttachMoneyIcon from '@mui/icons-material/AttachMoney';
+import CloseIcon from '@mui/icons-material/Close';
 
 interface DebtDialogProps {
   open: boolean;
@@ -22,6 +26,8 @@ interface DebtDialogProps {
 export const DebtDialog = ({ open, initialDebt = 0, onClose, onSave }: DebtDialogProps) => {
   const [debt, setDebt] = useState(initialDebt.toString());
   const [error, setError] = useState('');
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
 
   useEffect(() => {
     setDebt(initialDebt > 0 ? initialDebt.toString() : '');
@@ -46,9 +52,20 @@ export const DebtDialog = ({ open, initialDebt = 0, onClose, onSave }: DebtDialo
   };
 
   return (
-    <Dialog open={open} onClose={onClose} maxWidth="xs" fullWidth>
-      <DialogTitle sx={{ color: '#ef4444' }}>
+    <Dialog
+      open={open}
+      onClose={onClose}
+      maxWidth="xs"
+      fullWidth
+      fullScreen={isMobile}
+    >
+      <DialogTitle sx={{ color: '#ef4444', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
         {initialDebt ? 'Editar Deuda' : 'Agregar Deuda'}
+        {isMobile && (
+          <IconButton edge="end" color="inherit" onClick={onClose} aria-label="cerrar">
+            <CloseIcon />
+          </IconButton>
+        )}
       </DialogTitle>
       <DialogContent>
         <Box sx={{ pt: 1 }}>
