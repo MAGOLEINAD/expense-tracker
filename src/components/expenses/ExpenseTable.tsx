@@ -53,6 +53,7 @@ import { es } from 'date-fns/locale';
 import { useCategories } from '@/hooks/useCategories';
 import { useAuth } from '@/contexts/AuthContext';
 import { useStatusColors } from '@/hooks/useStatusColors';
+import { useUndoHistory } from '@/hooks/useUndoHistory';
 import { CommentDialog } from './CommentDialog';
 import { DebtDialog } from './DebtDialog';
 import { CardLinkDialog } from './CardLinkDialog';
@@ -204,6 +205,17 @@ export const ExpenseTable = ({ expenses, categories, onEdit, onUpdate, onDelete,
   const cursorPositionRef = useRef<number | null>(null);
   const shouldRestoreCursor = useRef<boolean>(false);
 
+  // Hook para manejar el historial de deshacer (Ctrl+Z)
+  const { addToHistory } = useUndoHistory<Expense>({
+    maxHistorySize: 20,
+    enableShortcut: true,
+    isEditing: editingCell !== null, // Bloquear Ctrl+Z mientras se está editando
+    onUndo: (restoredItem) => {
+      // Actualizar el gasto con el valor restaurado (silenciosamente)
+      onUpdate(restoredItem, undefined, true);
+    },
+  });
+
   // useEffect para restaurar la posición del cursor después de cambios de estado
   useEffect(() => {
     if (inputRef.current && cursorPositionRef.current !== null && shouldRestoreCursor.current) {
@@ -330,6 +342,9 @@ export const ExpenseTable = ({ expenses, categories, onEdit, onUpdate, onDelete,
 
     // Solo actualizar si el valor cambió
     if (newValue !== oldValue) {
+      // Guardar en el historial de deshacer ANTES de actualizar
+      addToHistory(expense, editingCell.field, oldValue);
+
       const updatedExpense = {
         ...expense,
         [editingCell.field]: newValue,
