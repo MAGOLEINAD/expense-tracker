@@ -82,6 +82,7 @@ export const ExpenseDialog = ({
   const [cardTotalARS, setCardTotalARS] = useState(0);
   const [cardTotalUSD, setCardTotalUSD] = useState(0);
   const [cardUSDRate, setCardUSDRate] = useState(usdRate);
+  const [cardTax, setCardTax] = useState(0);
 
   const isTC = formData.item ? isCreditCard({ ...formData, id: expense?.id } as Expense) : false;
 
@@ -98,6 +99,7 @@ export const ExpenseDialog = ({
       setCardTotalARS(expense.cardTotalARS || 0);
       setCardTotalUSD(expense.cardTotalUSD || 0);
       setCardUSDRate(expense.cardUSDRate || usdRate);
+      setCardTax(expense.cardTax || 0);
     } else {
       const newDefaultCategory = categories.length > 0 ? categories[0].id! : '';
       setFormData({
@@ -116,6 +118,7 @@ export const ExpenseDialog = ({
       setCardTotalARS(0);
       setCardTotalUSD(0);
       setCardUSDRate(usdRate);
+      setCardTax(0);
     }
   }, [expense, selectedMonth, selectedYear, categories, usdRate]);
 
@@ -138,8 +141,17 @@ export const ExpenseDialog = ({
       cleanedData.cardTotalARS = cardTotalARS;
       cleanedData.cardTotalUSD = cardTotalUSD;
       cleanedData.cardUSDRate = cardUSDRate;
+      cleanedData.cardTax = cardTax;
 
-      const cardFinalTotal = cardTotalARS + cardTotalUSD * cardUSDRate;
+      // Calcular el Total Final según la moneda
+      let cardFinalTotal: number;
+      if (formData.currency === 'USD') {
+        // Para TC en USD: convertir todo a USD y restar impuesto en USD
+        cardFinalTotal = cardTotalUSD + (cardTotalARS / cardUSDRate) - (cardTax / cardUSDRate);
+      } else {
+        // Para TC en ARS: convertir todo a ARS y restar impuesto en ARS
+        cardFinalTotal = cardTotalARS + (cardTotalUSD * cardUSDRate) - cardTax;
+      }
       cleanedData.importe = cardFinalTotal;
     }
 
@@ -310,7 +322,7 @@ export const ExpenseDialog = ({
               <Box
                 sx={{
                   display: 'grid',
-                  gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr 1fr' },
+                  gridTemplateColumns: { xs: '1fr', sm: 'repeat(4, 1fr)' },
                   gap: 2,
                 }}
               >
@@ -358,17 +370,42 @@ export const ExpenseDialog = ({
                     </IconButton>
                   </Tooltip>
                 </Box>
+
+                <TextField
+                  label="Impuesto (Db.rg 5617 30%)"
+                  type="number"
+                  value={cardTax}
+                  onChange={(e) => setCardTax(Number(e.target.value) || 0)}
+                  onFocus={(e) => e.target.select()}
+                  InputProps={{
+                    startAdornment: <Typography sx={{ mr: 0.5, color: 'text.secondary' }}>$</Typography>,
+                  }}
+                />
               </Box>
 
               <Box sx={{ p: 2, bgcolor: 'action.hover', borderRadius: 1 }}>
                 <Typography variant="body2" color="text.secondary">
                   Total Final de la TC:
                 </Typography>
-                <Typography variant="h6" color="primary" fontWeight="bold">
-                  $ {(cardTotalARS + cardTotalUSD * cardUSDRate).toLocaleString('es-AR', { maximumFractionDigits: 0 })}
-                </Typography>
+                {formData.currency === 'USD' ? (
+                  <>
+                    <Typography variant="h6" color="primary" fontWeight="bold">
+                      USD {(cardTotalUSD + (cardTotalARS / cardUSDRate) - (cardTax / cardUSDRate)).toLocaleString('es-AR', {
+                        minimumFractionDigits: 2,
+                        maximumFractionDigits: 2
+                      })}
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary" sx={{ mt: 0.5 }}>
+                      Equivalente: $ {((cardTotalUSD + (cardTotalARS / cardUSDRate) - (cardTax / cardUSDRate)) * cardUSDRate).toLocaleString('es-AR', { maximumFractionDigits: 0 })}
+                    </Typography>
+                  </>
+                ) : (
+                  <Typography variant="h6" color="primary" fontWeight="bold">
+                    $ {(cardTotalARS + (cardTotalUSD * cardUSDRate) - cardTax).toLocaleString('es-AR', { maximumFractionDigits: 0 })}
+                  </Typography>
+                )}
                 <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.5 }}>
-                  El importe final se calculará restando los gastos asociados
+                  El importe final se calculará restando los gastos asociados y el impuesto.
                 </Typography>
               </Box>
             </>

@@ -145,14 +145,15 @@ export const ExpenseTable = ({ expenses, categories, onEdit, onUpdate, onDelete,
     const cardTotalARS = cardExpense.cardTotalARS || 0;
     const cardTotalUSD = cardExpense.cardTotalUSD || 0;
     const cardUSDRate = cardExpense.cardUSDRate || usdRate;
+    const cardTax = cardExpense.cardTax || 0;
 
     // Suma de gastos asociados
     const linkedExpenses = getLinkedExpenses(cardExpense.id || '', expenses);
 
     // Si la TC está en USD, calcular todo en USD
     if (cardExpense.currency === 'USD') {
-      // Total final de la TC en USD
-      const cardFinalTotal = cardTotalUSD + (cardTotalARS / cardUSDRate);
+      // Total final de la TC en USD (con impuesto en ARS convertido a USD)
+      const cardFinalTotal = cardTotalUSD + (cardTotalARS / cardUSDRate) - (cardTax / cardUSDRate);
 
       // Total de gastos asociados en USD
       const linkedTotal = linkedExpenses.reduce((sum, exp) => {
@@ -163,7 +164,7 @@ export const ExpenseTable = ({ expenses, categories, onEdit, onUpdate, onDelete,
       return cardFinalTotal - linkedTotal;
     } else {
       // Si la TC está en ARS (o por defecto), calcular todo en ARS
-      const cardFinalTotal = cardTotalARS + (cardTotalUSD * cardUSDRate);
+      const cardFinalTotal = cardTotalARS + (cardTotalUSD * cardUSDRate) - cardTax;
 
       const linkedTotal = linkedExpenses.reduce((sum, exp) => {
         const amount = exp.currency === 'ARS' ? exp.importe : exp.importe * cardUSDRate;
@@ -226,7 +227,12 @@ export const ExpenseTable = ({ expenses, categories, onEdit, onUpdate, onDelete,
     const input = e.target as HTMLInputElement;
     cursorPositionRef.current = input.selectionStart;
     shouldRestoreCursor.current = true;
-    setEditValue(e.target.value);
+    let value = e.target.value;
+    // Convertir punto a coma automáticamente para campos de importe
+    if (editingCell?.field === 'importe') {
+      value = value.replace(/\./g, ',');
+    }
+    setEditValue(value);
   };
 
   // Inicializar expandedCategories con todas las categorías
@@ -316,7 +322,8 @@ export const ExpenseTable = ({ expenses, categories, onEdit, onUpdate, onDelete,
         newValue = editValue;
       }
     } else if (editingCell.field === 'importe') {
-      newValue = Number(editValue);
+      // Convertir coma a punto antes de convertir a número
+      newValue = Number(editValue.replace(',', '.'));
     }
 
     const oldValue = expense[editingCell.field as keyof Expense];
@@ -1292,7 +1299,7 @@ export const ExpenseTable = ({ expenses, categories, onEdit, onUpdate, onDelete,
                                 inputRef={inputRef}
                                 autoFocus
                                 size="small"
-                                type="number"
+                                type="text"
                                 variant="standard"
                                 sx={{ maxWidth: 100 }}
                               />

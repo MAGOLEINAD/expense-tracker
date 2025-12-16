@@ -27,6 +27,7 @@ export interface Expense {
   cardTotalARS?: number; // Total ARS de la TC (solo para gastos TC)
   cardTotalUSD?: number; // Total USD de la TC (solo para gastos TC)
   cardUSDRate?: number; // Cotización USD usada para la TC (solo para gastos TC)
+  cardTax?: number; // Impuesto Db.rg 5617 30% (solo para gastos TC)
   createdAt: Date;
   updatedAt: Date;
 }
