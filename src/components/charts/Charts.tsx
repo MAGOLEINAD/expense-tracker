@@ -85,14 +85,15 @@ export const Charts = ({ allExpenses, currentYear, currentMonth, categories }: C
     const cardTotalARS = cardExpense.cardTotalARS || 0;
     const cardTotalUSD = cardExpense.cardTotalUSD || 0;
     const cardUSDRate = cardExpense.cardUSDRate || usdRate;
+    const cardTax = cardExpense.cardTax || 0;
 
     // Suma de gastos asociados
     const linkedExpenses = allExpenses.filter(exp => exp.linkedToCardId === cardExpense.id);
 
     // Si la TC está en USD, calcular todo en USD
     if (cardExpense.currency === 'USD') {
-      // Total final de la TC en USD
-      const cardFinalTotal = cardTotalUSD + (cardTotalARS / cardUSDRate);
+      // Total final de la TC en USD (con impuesto en ARS convertido a USD)
+      const cardFinalTotal = cardTotalUSD + (cardTotalARS / cardUSDRate) - (cardTax / cardUSDRate);
 
       // Total de gastos asociados en USD
       const linkedTotal = linkedExpenses.reduce((sum, exp) => {
@@ -103,7 +104,7 @@ export const Charts = ({ allExpenses, currentYear, currentMonth, categories }: C
       return cardFinalTotal - linkedTotal;
     } else {
       // Si la TC está en ARS (o por defecto), calcular todo en ARS
-      const cardFinalTotal = cardTotalARS + (cardTotalUSD * cardUSDRate);
+      const cardFinalTotal = cardTotalARS + (cardTotalUSD * cardUSDRate) - cardTax;
 
       const linkedTotal = linkedExpenses.reduce((sum, exp) => {
         const amount = exp.currency === 'ARS' ? exp.importe : exp.importe * cardUSDRate;
@@ -203,7 +204,7 @@ export const Charts = ({ allExpenses, currentYear, currentMonth, categories }: C
   // 1️⃣ Distribución de gastos por categoría (mes actual)
   const categoryDistributionData = useMemo(() => {
     const monthExpenses = allExpenses.filter(
-      exp => exp.month === currentMonth && exp.year === currentYear && exp.status !== 'pendiente' && exp.status !== 'sin cargo' && !exp.linkedToCardId
+      exp => exp.month === currentMonth && exp.year === currentYear && exp.status !== 'pendiente' && exp.status !== 'sin cargo'
     );
 
     const categoryTotals: Record<string, { ars: number; usd: number; totalARS: number }> = {};
@@ -235,7 +236,7 @@ export const Charts = ({ allExpenses, currentYear, currentMonth, categories }: C
   // 2️⃣ Comparación de categorías (mes actual)
   const categoryComparisonData = useMemo(() => {
     const monthExpenses = allExpenses.filter(
-      exp => exp.month === currentMonth && exp.year === currentYear && exp.status !== 'pendiente' && exp.status !== 'sin cargo' && !exp.linkedToCardId
+      exp => exp.month === currentMonth && exp.year === currentYear && exp.status !== 'pendiente' && exp.status !== 'sin cargo'
     );
 
     const categoryTotals: Record<string, { ars: number; usd: number; totalARS: number }> = {};
@@ -269,7 +270,7 @@ export const Charts = ({ allExpenses, currentYear, currentMonth, categories }: C
   const monthlyEvolutionData = useMemo(() => {
     return MONTHS.map((month, index) => {
       const monthExpenses = allExpenses.filter(
-        exp => exp.month === index + 1 && exp.year === currentYear && exp.status !== 'pendiente' && exp.status !== 'sin cargo' && includedCategoryIds.has(exp.category) && !exp.linkedToCardId
+        exp => exp.month === index + 1 && exp.year === currentYear && exp.status !== 'pendiente' && exp.status !== 'sin cargo' && includedCategoryIds.has(exp.category)
       );
 
       const total = monthExpenses.reduce((sum, exp) => sum + expenseToARS(exp), 0);
@@ -285,7 +286,7 @@ export const Charts = ({ allExpenses, currentYear, currentMonth, categories }: C
   const categoryEvolutionData = useMemo(() => {
     return MONTHS.map((month, index) => {
       const monthExpenses = allExpenses.filter(
-        exp => exp.month === index + 1 && exp.year === currentYear && exp.status !== 'pendiente' && exp.status !== 'sin cargo' && !exp.linkedToCardId
+        exp => exp.month === index + 1 && exp.year === currentYear && exp.status !== 'pendiente' && exp.status !== 'sin cargo'
       );
 
       const categoryTotals: Record<string, number> = {};
@@ -319,7 +320,7 @@ export const Charts = ({ allExpenses, currentYear, currentMonth, categories }: C
   const averageMonthly = yearToDateTotal / 12;
   const currentMonthTotal = useMemo(() => {
     const monthExpenses = allExpenses.filter(
-      exp => exp.month === currentMonth && exp.year === currentYear && exp.status !== 'pendiente' && exp.status !== 'sin cargo' && includedCategoryIds.has(exp.category) && !exp.linkedToCardId
+      exp => exp.month === currentMonth && exp.year === currentYear && exp.status !== 'pendiente' && exp.status !== 'sin cargo' && includedCategoryIds.has(exp.category)
     );
     return monthExpenses.reduce((sum, exp) => sum + expenseToARS(exp), 0);
   }, [allExpenses, currentMonth, currentYear, includedCategoryIds, usdRate]);
@@ -328,14 +329,14 @@ export const Charts = ({ allExpenses, currentYear, currentMonth, categories }: C
   const myInflationData = useMemo(() => {
     // Inflación mensual: comparar mes actual vs mes anterior
     const currentMonthExpenses = allExpenses.filter(
-      exp => exp.month === currentMonth && exp.year === currentYear && exp.status !== 'pendiente' && exp.status !== 'sin cargo' && includedCategoryIds.has(exp.category) && !exp.linkedToCardId
+      exp => exp.month === currentMonth && exp.year === currentYear && exp.status !== 'pendiente' && exp.status !== 'sin cargo' && includedCategoryIds.has(exp.category)
     );
     const currentMonthTotal = currentMonthExpenses.reduce((sum, exp) => sum + expenseToARS(exp), 0);
 
     const previousMonth = currentMonth === 1 ? 12 : currentMonth - 1;
     const previousMonthYear = currentMonth === 1 ? currentYear - 1 : currentYear;
     const previousMonthExpenses = allExpenses.filter(
-      exp => exp.month === previousMonth && exp.year === previousMonthYear && exp.status !== 'pendiente' && exp.status !== 'sin cargo' && includedCategoryIds.has(exp.category) && !exp.linkedToCardId
+      exp => exp.month === previousMonth && exp.year === previousMonthYear && exp.status !== 'pendiente' && exp.status !== 'sin cargo' && includedCategoryIds.has(exp.category)
     );
     const previousMonthTotal = previousMonthExpenses.reduce((sum, exp) => sum + expenseToARS(exp), 0);
 
@@ -344,10 +345,10 @@ export const Charts = ({ allExpenses, currentYear, currentMonth, categories }: C
       : 0;
 
     // Inflación anual: comparar año actual vs año anterior
-    const currentYearExpenses = allExpenses.filter(exp => exp.year === currentYear && exp.status !== 'pendiente' && exp.status !== 'sin cargo' && includedCategoryIds.has(exp.category) && !exp.linkedToCardId);
+    const currentYearExpenses = allExpenses.filter(exp => exp.year === currentYear && exp.status !== 'pendiente' && exp.status !== 'sin cargo' && includedCategoryIds.has(exp.category));
     const currentYearTotal = currentYearExpenses.reduce((sum, exp) => sum + expenseToARS(exp), 0);
 
-    const previousYearExpenses = allExpenses.filter(exp => exp.year === currentYear - 1 && exp.status !== 'pendiente' && exp.status !== 'sin cargo' && includedCategoryIds.has(exp.category) && !exp.linkedToCardId);
+    const previousYearExpenses = allExpenses.filter(exp => exp.year === currentYear - 1 && exp.status !== 'pendiente' && exp.status !== 'sin cargo' && includedCategoryIds.has(exp.category));
     const previousYearTotal = previousYearExpenses.reduce((sum, exp) => sum + expenseToARS(exp), 0);
 
     const annualInflation = previousYearTotal > 0
@@ -363,7 +364,7 @@ export const Charts = ({ allExpenses, currentYear, currentMonth, categories }: C
   // Calcular totales de gastos excluidos (Gastos ajenos)
   const excludedTotals = useMemo(() => {
     const currentMonthExpenses = allExpenses.filter(
-      exp => exp.month === currentMonth && exp.year === currentYear && exp.status !== 'pendiente' && exp.status !== 'sin cargo' && !includedCategoryIds.has(exp.category) && !exp.linkedToCardId
+      exp => exp.month === currentMonth && exp.year === currentYear && exp.status !== 'pendiente' && exp.status !== 'sin cargo' && !includedCategoryIds.has(exp.category)
     );
     const total = currentMonthExpenses.reduce((sum, exp) => sum + expenseToARS(exp), 0);
 

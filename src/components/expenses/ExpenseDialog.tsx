@@ -84,6 +84,12 @@ export const ExpenseDialog = ({
   const [cardUSDRate, setCardUSDRate] = useState(usdRate);
   const [cardTax, setCardTax] = useState(0);
 
+  // Estados de texto para TCs (manejo de punto decimal como coma)
+  const [cardTotalARSText, setCardTotalARSText] = useState('0');
+  const [cardTotalUSDText, setCardTotalUSDText] = useState('0');
+  const [cardUSDRateText, setCardUSDRateText] = useState(String(usdRate));
+  const [cardTaxText, setCardTaxText] = useState('0');
+
   const isTC = formData.item ? isCreditCard({ ...formData, id: expense?.id } as Expense) : false;
 
   useEffect(() => {
@@ -96,10 +102,21 @@ export const ExpenseDialog = ({
       });
       setImporteText(String(expense.importe || 0).replace('.', ','));
 
-      setCardTotalARS(expense.cardTotalARS || 0);
-      setCardTotalUSD(expense.cardTotalUSD || 0);
-      setCardUSDRate(expense.cardUSDRate || usdRate);
-      setCardTax(expense.cardTax || 0);
+      const arsValue = expense.cardTotalARS || 0;
+      const usdValue = expense.cardTotalUSD || 0;
+      const rateValue = expense.cardUSDRate || usdRate;
+      const taxValue = expense.cardTax || 0;
+
+      setCardTotalARS(arsValue);
+      setCardTotalUSD(usdValue);
+      setCardUSDRate(rateValue);
+      setCardTax(taxValue);
+
+      // Inicializar estados de texto con comas
+      setCardTotalARSText(String(arsValue).replace('.', ','));
+      setCardTotalUSDText(String(usdValue).replace('.', ','));
+      setCardUSDRateText(String(rateValue).replace('.', ','));
+      setCardTaxText(String(taxValue).replace('.', ','));
     } else {
       const newDefaultCategory = categories.length > 0 ? categories[0].id! : '';
       setFormData({
@@ -119,6 +136,10 @@ export const ExpenseDialog = ({
       setCardTotalUSD(0);
       setCardUSDRate(usdRate);
       setCardTax(0);
+      setCardTotalARSText('0');
+      setCardTotalUSDText('0');
+      setCardUSDRateText(String(usdRate).replace('.', ','));
+      setCardTaxText('0');
     }
   }, [expense, selectedMonth, selectedYear, categories, usdRate]);
 
@@ -328,20 +349,44 @@ export const ExpenseDialog = ({
               >
                 <TextField
                   label="Total ARS"
-                  type="number"
-                  value={cardTotalARS}
-                  onChange={(e) => setCardTotalARS(Number(e.target.value) || 0)}
+                  type="text"
+                  value={cardTotalARSText}
+                  onChange={(e) => {
+                    let value = e.target.value;
+                    value = value.replace(/\./g, ',');
+                    if (value === '' || value === '-' || /^-?\d*,?\d{0,2}$/.test(value)) {
+                      setCardTotalARSText(value);
+                      const numValue = value.replace(',', '.');
+                      const num = numValue === '' || numValue === '-' ? 0 : parseFloat(numValue);
+                      if (!isNaN(num)) {
+                        setCardTotalARS(num);
+                      }
+                    }
+                  }}
                   onFocus={(e) => e.target.select()}
+                  inputProps={{ inputMode: 'decimal' }}
                   InputProps={{
                     startAdornment: <Typography sx={{ mr: 0.5, color: 'text.secondary' }}>$</Typography>,
                   }}
                 />
                 <TextField
                   label="Total USD"
-                  type="number"
-                  value={cardTotalUSD}
-                  onChange={(e) => setCardTotalUSD(Number(e.target.value) || 0)}
+                  type="text"
+                  value={cardTotalUSDText}
+                  onChange={(e) => {
+                    let value = e.target.value;
+                    value = value.replace(/\./g, ',');
+                    if (value === '' || value === '-' || /^-?\d*,?\d{0,2}$/.test(value)) {
+                      setCardTotalUSDText(value);
+                      const numValue = value.replace(',', '.');
+                      const num = numValue === '' || numValue === '-' ? 0 : parseFloat(numValue);
+                      if (!isNaN(num)) {
+                        setCardTotalUSD(num);
+                      }
+                    }
+                  }}
                   onFocus={(e) => e.target.select()}
+                  inputProps={{ inputMode: 'decimal' }}
                   InputProps={{
                     startAdornment: <Typography sx={{ mr: 0.5, color: 'text.secondary' }}>USD</Typography>,
                   }}
@@ -350,11 +395,23 @@ export const ExpenseDialog = ({
                 <Box sx={{ display: 'flex', gap: 0.5, alignItems: 'center' }}>
                   <TextField
                     label="Cotización USD"
-                    type="number"
+                    type="text"
                     fullWidth
-                    value={cardUSDRate}
-                    onChange={(e) => setCardUSDRate(Number(e.target.value) || 0)}
+                    value={cardUSDRateText}
+                    onChange={(e) => {
+                      let value = e.target.value;
+                      value = value.replace(/\./g, ',');
+                      if (value === '' || value === '-' || /^-?\d*,?\d{0,2}$/.test(value)) {
+                        setCardUSDRateText(value);
+                        const numValue = value.replace(',', '.');
+                        const num = numValue === '' || numValue === '-' ? 0 : parseFloat(numValue);
+                        if (!isNaN(num)) {
+                          setCardUSDRate(num);
+                        }
+                      }
+                    }}
                     onFocus={(e) => e.target.select()}
+                    inputProps={{ inputMode: 'decimal' }}
                     InputProps={{
                       startAdornment: <Typography sx={{ mr: 0.5, color: 'text.secondary' }}>$</Typography>,
                     }}
@@ -362,7 +419,10 @@ export const ExpenseDialog = ({
                   <Tooltip title="Recargar cotización de la API" arrow>
                     <IconButton
                       size="small"
-                      onClick={() => setCardUSDRate(usdRate)}
+                      onClick={() => {
+                        setCardUSDRate(usdRate);
+                        setCardUSDRateText(String(usdRate).replace('.', ','));
+                      }}
                       color="primary"
                       sx={{ flexShrink: 0, mt: 0.5 }}
                     >
@@ -373,10 +433,22 @@ export const ExpenseDialog = ({
 
                 <TextField
                   label="Impuesto (Db.rg 5617 30%)"
-                  type="number"
-                  value={cardTax}
-                  onChange={(e) => setCardTax(Number(e.target.value) || 0)}
+                  type="text"
+                  value={cardTaxText}
+                  onChange={(e) => {
+                    let value = e.target.value;
+                    value = value.replace(/\./g, ',');
+                    if (value === '' || value === '-' || /^-?\d*,?\d{0,2}$/.test(value)) {
+                      setCardTaxText(value);
+                      const numValue = value.replace(',', '.');
+                      const num = numValue === '' || numValue === '-' ? 0 : parseFloat(numValue);
+                      if (!isNaN(num)) {
+                        setCardTax(num);
+                      }
+                    }
+                  }}
                   onFocus={(e) => e.target.select()}
+                  inputProps={{ inputMode: 'decimal' }}
                   InputProps={{
                     startAdornment: <Typography sx={{ mr: 0.5, color: 'text.secondary' }}>$</Typography>,
                   }}

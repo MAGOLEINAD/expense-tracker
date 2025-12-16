@@ -792,13 +792,13 @@ export const ExpenseTable = ({ expenses, categories, onEdit, onUpdate, onDelete,
     return !getIncludeInTotals(cat.categoryId, category);
   });
 
-  const grandTotalARS = includedCategories.reduce((sum, cat) => sum + cat.totalARS, 0);
-  const grandTotalUSD = includedCategories.reduce((sum, cat) => sum + cat.totalUSD, 0);
+  const grandTotalARS = includedCategories.reduce((sum, cat) => sum + cat.subtotalARS, 0);
+  const grandTotalUSD = includedCategories.reduce((sum, cat) => sum + cat.subtotalUSD, 0);
   const grandTotalInARS = grandTotalARS + (grandTotalUSD * usdRate);
 
   // Calcular totales de gastos excluidos
-  const excludedTotalARS = excludedCategories.reduce((sum, cat) => sum + cat.totalARS, 0);
-  const excludedTotalUSD = excludedCategories.reduce((sum, cat) => sum + cat.totalUSD, 0);
+  const excludedTotalARS = excludedCategories.reduce((sum, cat) => sum + cat.subtotalARS, 0);
+  const excludedTotalUSD = excludedCategories.reduce((sum, cat) => sum + cat.subtotalUSD, 0);
   const excludedTotalInARS = excludedTotalARS + (excludedTotalUSD * usdRate);
 
   // Calcular total de deudas
