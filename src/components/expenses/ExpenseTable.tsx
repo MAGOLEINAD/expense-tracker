@@ -1871,6 +1871,8 @@ export const ExpenseTable = ({ expenses, categories, onEdit, onUpdate, onDelete,
             ? { top: statusMenuPosition.top, left: statusMenuPosition.left }
             : undefined
         }
+        disableRestoreFocus
+        disableEnforceFocus
         slotProps={{
           paper: {
             sx: {
@@ -1916,6 +1918,8 @@ export const ExpenseTable = ({ expenses, categories, onEdit, onUpdate, onDelete,
             ? { top: sortMenuPosition.top, left: sortMenuPosition.left }
             : undefined
         }
+        disableRestoreFocus
+        disableEnforceFocus
         slotProps={{
           paper: {
             sx: {

@@ -17,7 +17,10 @@ interface DashboardAppBarProps {
   user: User | null;
   selectedMonth: number;
   selectedYear: number;
-  usdRates: { compra: number; venta: number };
+  usdRates: {
+    oficial: { compra: number; venta: number };
+    blue: { compra: number; venta: number };
+  };
   loadingUsd: boolean;
   activeTab: number;
   userMenuAnchor: HTMLElement | null;
@@ -192,7 +195,7 @@ export const DashboardAppBar = ({
               showBorder
             />
 
-            <UsdRateDisplay venta={usdRates.venta} loading={loadingUsd} onClick={onOpenUsdPopover} />
+            <UsdRateDisplay venta={usdRates.oficial.venta} loading={loadingUsd} onClick={onOpenUsdPopover} />
 
             <Box sx={{ flexGrow: 1 }} />
 

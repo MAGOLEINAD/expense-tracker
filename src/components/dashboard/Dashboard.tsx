@@ -47,7 +47,10 @@ export const Dashboard = () => {
   // Data State
   const [editingExpense, setEditingExpense] = useState<Expense | null>(null);
   const [expenseToDelete, setExpenseToDelete] = useState<string | null>(null);
-  const [usdRates, setUsdRates] = useState({ compra: 0, venta: 0 });
+  const [usdRates, setUsdRates] = useState({
+    oficial: { compra: 0, venta: 0 },
+    blue: { compra: 0, venta: 0 }
+  });
   const [loadingUsd, setLoadingUsd] = useState(true);
   const [deletingExpense, setDeletingExpense] = useState(false);
 
@@ -68,19 +71,32 @@ export const Dashboard = () => {
   const { categories } = useCategories(user?.uid);
   const { colors: statusColors, saveColors } = useStatusColors();
 
-  // Fetch USD rate
+  // Fetch USD rates (oficial and blue)
   useEffect(() => {
     setLoadingUsd(true);
-    fetch('https://dolarapi.com/v1/dolares/oficial')
-      .then((res) => res.json())
-      .then((data) => {
-        if (data.compra && data.venta) {
-          setUsdRates({ compra: data.compra, venta: data.venta });
-        }
+
+    Promise.all([
+      fetch('https://dolarapi.com/v1/dolares/oficial').then(res => res.json()),
+      fetch('https://dolarapi.com/v1/dolares/blue').then(res => res.json())
+    ])
+      .then(([oficialData, blueData]) => {
+        setUsdRates({
+          oficial: {
+            compra: oficialData.compra || 1000,
+            venta: oficialData.venta || 1020
+          },
+          blue: {
+            compra: blueData.compra || 1200,
+            venta: blueData.venta || 1200
+          }
+        });
       })
       .catch(() => {
-        console.log('Using default USD rate');
-        setUsdRates({ compra: 1000, venta: 1020 });
+        console.log('Using default USD rates');
+        setUsdRates({
+          oficial: { compra: 1000, venta: 1020 },
+          blue: { compra: 1200, venta: 1200 }
+        });
       })
       .finally(() => {
         setLoadingUsd(false);
@@ -269,8 +285,10 @@ export const Dashboard = () => {
       <UsdRatePopover
         open={Boolean(usdPopoverAnchor)}
         anchorEl={usdPopoverAnchor}
-        compra={usdRates.compra}
-        venta={usdRates.venta}
+        oficialCompra={usdRates.oficial.compra}
+        oficialVenta={usdRates.oficial.venta}
+        blueCompra={usdRates.blue.compra}
+        blueVenta={usdRates.blue.venta}
         onClose={() => setUsdPopoverAnchor(null)}
       />
 
@@ -330,7 +348,7 @@ export const Dashboard = () => {
         onOpenCategoryManager={() => {
           setCategoryManagerOpen(true);
         }}
-        usdRate={usdRates.venta}
+        usdRate={usdRates.blue.venta}
       />
 
       <TemplateDialog

@@ -37,6 +37,17 @@ export const DatePickerPopover = ({
       open={open}
       anchorEl={anchorEl}
       onClose={onClose}
+      disableRestoreFocus
+      disableEnforceFocus
+      slotProps={{
+        root: {
+          slotProps: {
+            backdrop: {
+              invisible: false,
+            },
+          },
+        },
+      }}
       anchorOrigin={{
         vertical: 'bottom',
         horizontal: 'center',
