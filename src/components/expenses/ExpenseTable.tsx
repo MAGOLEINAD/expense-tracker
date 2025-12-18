@@ -47,6 +47,7 @@ import SortIcon from '@mui/icons-material/Sort';
 import CheckCircleIcon from '@mui/icons-material/CheckCircle';
 import CancelIcon from '@mui/icons-material/Cancel';
 import LinkIcon from '@mui/icons-material/Link';
+import AttachFileIcon from '@mui/icons-material/AttachFile';
 import type { Expense, Category, PaymentStatus, UserCategory } from '@/types';
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -59,6 +60,7 @@ import { DebtDialog } from './DebtDialog';
 import { CardLinkDialog } from './CardLinkDialog';
 import { ExpenseTableMobile } from './ExpenseTableMobile';
 import { ExpenseDetailDialog } from './ExpenseDetailDialog';
+import { ImageViewerDialog } from '../common/ImageViewerDialog';
 import * as MuiIcons from '@mui/icons-material';
 import { useSnackbar } from 'notistack';
 import { formatDateInput, isCreditCard, getLinkedExpenses } from '@/utils';
@@ -193,10 +195,16 @@ export const ExpenseTable = ({ expenses, categories, onEdit, onUpdate, onDelete,
   const [expenseToUnlink, setExpenseToUnlink] = useState<Expense | null>(null);
   const [deleteWarningDialogOpen, setDeleteWarningDialogOpen] = useState(false);
   const [expenseToDelete, setExpenseToDelete] = useState<Expense | null>(null);
+  const [imageViewerOpen, setImageViewerOpen] = useState(false);
+  const [viewerImages, setViewerImages] = useState<string[]>([]);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [statusMenuExpense, setStatusMenuExpense] = useState<Expense | null>(null);
   const [statusMenuPosition, setStatusMenuPosition] = useState<{ top: number; left: number } | null>(null);
-  const [sortType, setSortType] = useState<SortType>('manual');
+  const [sortType, setSortType] = useState<SortType>(() => {
+    // Cargar el tipo de ordenamiento desde localStorage
+    const savedSortType = localStorage.getItem('expenseTableSortType');
+    return (savedSortType as SortType) || 'manual';
+  });
   const [sortMenuPosition, setSortMenuPosition] = useState<{ top: number; left: number } | null>(null);
   const [optimisticIncludeInTotals, setOptimisticIncludeInTotals] = useState<Record<string, boolean>>({});
 
@@ -204,6 +212,11 @@ export const ExpenseTable = ({ expenses, categories, onEdit, onUpdate, onDelete,
   const inputRef = useRef<HTMLInputElement>(null);
   const cursorPositionRef = useRef<number | null>(null);
   const shouldRestoreCursor = useRef<boolean>(false);
+
+  // Guardar el tipo de ordenamiento en localStorage cada vez que cambia
+  useEffect(() => {
+    localStorage.setItem('expenseTableSortType', sortType);
+  }, [sortType]);
 
   // Hook para manejar el historial de deshacer (Ctrl+Z)
   const { addToHistory } = useUndoHistory<Expense>({
@@ -468,6 +481,13 @@ export const ExpenseTable = ({ expenses, categories, onEdit, onUpdate, onDelete,
   const handleOpenDebtDialog = (expense: Expense) => {
     setSelectedExpense(expense);
     setDebtDialogOpen(true);
+  };
+
+  const handleOpenImageViewer = (expense: Expense) => {
+    if (expense.attachments && expense.attachments.length > 0) {
+      setViewerImages(expense.attachments);
+      setImageViewerOpen(true);
+    }
   };
 
   const handleSaveDebt = async (debt: number) => {
@@ -1428,6 +1448,19 @@ export const ExpenseTable = ({ expenses, categories, onEdit, onUpdate, onDelete,
                               ) : (
                                 <Box sx={{ width: 34 }} /> // Placeholder para mantener alineación
                               )}
+                              {expense.attachments && expense.attachments.length > 0 && (
+                                <Tooltip title={`${expense.attachments.length} archivo(s) adjunto(s)`} arrow>
+                                  <span>
+                                    <IconButton
+                                      size="small"
+                                      onClick={() => handleOpenImageViewer(expense)}
+                                      sx={{ color: '#0ea5e9' }}
+                                    >
+                                      <AttachFileIcon fontSize="small" />
+                                    </IconButton>
+                                  </span>
+                                </Tooltip>
+                              )}
                               <Tooltip title={expense.comment || ''} arrow>
                                 <span>
                                   <IconButton
@@ -2021,6 +2054,16 @@ export const ExpenseTable = ({ expenses, categories, onEdit, onUpdate, onDelete,
           setSelectedExpense(null);
         }}
         onSave={handleSaveDebt}
+      />
+
+      {/* Dialog para visualizar imágenes */}
+      <ImageViewerDialog
+        open={imageViewerOpen}
+        images={viewerImages}
+        onClose={() => {
+          setImageViewerOpen(false);
+          setViewerImages([]);
+        }}
       />
 
       {/* Dialog para asociar gastos a TC */}

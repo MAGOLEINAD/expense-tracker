@@ -136,7 +136,16 @@ export const useExpenses = (month: number, year: number) => {
     }
   };
 
-  const applyTemplate = async (sourceMonth: number, sourceYear: number, targetMonth: number, targetYear: number, keepCardLinks: boolean = false) => {
+  const applyTemplate = async (
+    sourceMonth: number,
+    sourceYear: number,
+    targetMonth: number,
+    targetYear: number,
+    keepCardLinks: boolean = false,
+    keepRecurringExpenses: boolean = true,
+    keepPagoAnual: boolean = true,
+    keepBonificado: boolean = true
+  ) => {
     if (!user) return;
 
     try {
@@ -156,10 +165,34 @@ export const useExpenses = (month: number, year: number) => {
         });
       });
 
-      const sourceExpenses = snapshot.docs.map((doc: any) => ({
+      let sourceExpenses = snapshot.docs.map((doc: any) => ({
         id: doc.id,
         ...doc.data()
       })) as Expense[];
+
+      // Filtrar gastos según los switches de gastos recurrentes
+      if (keepRecurringExpenses) {
+        // Si está activado el master switch, filtrar según los switches específicos
+        sourceExpenses = sourceExpenses.filter((expense) => {
+          // Mantener el gasto si:
+          // 1. No es "pago anual" ni "bonificado" (siempre se copia)
+          // 2. Es "pago anual" y keepPagoAnual está activado
+          // 3. Es "bonificado" y keepBonificado está activado
+          if (expense.status === 'pago anual') {
+            return keepPagoAnual;
+          }
+          if (expense.status === 'bonificado') {
+            return keepBonificado;
+          }
+          // Los demás gastos siempre se copian
+          return true;
+        });
+      } else {
+        // Si el master switch está desactivado, excluir todos los "pago anual" y "bonificado"
+        sourceExpenses = sourceExpenses.filter((expense) => {
+          return expense.status !== 'pago anual' && expense.status !== 'bonificado';
+        });
+      }
 
       // Crear batch para agregar múltiples documentos
       const batch = writeBatch(db);
@@ -177,6 +210,10 @@ export const useExpenses = (month: number, year: number) => {
           oldToNewIdMap.set(expense.id, newId);
         }
 
+        // Determinar si este gasto debe copiarse tal cual (pago anual o bonificado con switches activos)
+        const isRecurringExpense = (expense.status === 'pago anual' && keepPagoAnual) ||
+                                    (expense.status === 'bonificado' && keepBonificado);
+
         const newExpense: any = {
           userId: user.uid,
           item: expense.item,
@@ -186,16 +223,29 @@ export const useExpenses = (month: number, year: number) => {
           // Copiar icono y su color si existen
           ...(expense.icon && { icon: expense.icon }),
           ...(expense.iconColor && { iconColor: expense.iconColor }),
-          // Campos vacíos/pendientes
-          vto: '',
-          fechaPago: '',
-          importe: 0,
-          status: 'pendiente' as const,
+          // Si es gasto recurrente, copiar tal cual. Si no, resetear a pendiente
+          vto: isRecurringExpense ? expense.vto : '',
+          fechaPago: isRecurringExpense ? expense.fechaPago : '',
+          importe: isRecurringExpense ? expense.importe : 0,
+          status: isRecurringExpense ? expense.status : ('pendiente' as const),
           month: targetMonth,
           year: targetYear,
           createdAt: timestamp,
           updatedAt: timestamp,
         };
+
+        // Si es gasto recurrente, copiar también comentarios, deuda y attachments
+        if (isRecurringExpense) {
+          if (expense.comment) {
+            newExpense.comment = expense.comment;
+          }
+          if (expense.debt) {
+            newExpense.debt = expense.debt;
+          }
+          if (expense.attachments && expense.attachments.length > 0) {
+            newExpense.attachments = expense.attachments;
+          }
+        }
 
         // Si keepCardLinks está activado, mantener asociaciones y datos de TC
         if (keepCardLinks) {

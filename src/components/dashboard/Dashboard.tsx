@@ -202,9 +202,25 @@ export const Dashboard = () => {
   };
 
   // Event Handlers - Template
-  const handleApplyTemplate = async (sourceMonth: number, sourceYear: number, keepCardLinks: boolean) => {
+  const handleApplyTemplate = async (
+    sourceMonth: number,
+    sourceYear: number,
+    keepCardLinks: boolean,
+    keepRecurringExpenses: boolean,
+    keepPagoAnual: boolean,
+    keepBonificado: boolean
+  ) => {
     try {
-      await applyTemplate(sourceMonth, sourceYear, selectedMonth, selectedYear, keepCardLinks);
+      await applyTemplate(
+        sourceMonth,
+        sourceYear,
+        selectedMonth,
+        selectedYear,
+        keepCardLinks,
+        keepRecurringExpenses,
+        keepPagoAnual,
+        keepBonificado
+      );
       enqueueSnackbar('Template aplicado exitosamente', { variant: 'success' });
     } catch (error) {
       console.error('Error applying template:', error);

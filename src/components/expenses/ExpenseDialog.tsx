@@ -17,17 +17,25 @@ import {
   Tooltip,
   useMediaQuery,
   useTheme,
+  Chip,
+  CircularProgress,
 } from '@mui/material';
 import { useState, useEffect } from 'react';
 import type { Expense, Currency, PaymentStatus, UserCategory } from '@/types';
-import { PAYMENT_STATUSES, PAYMENT_STATUS_LABELS, isCreditCard } from '@/utils';
+import { PAYMENT_STATUSES, PAYMENT_STATUS_LABELS, isCreditCard, uploadExpenseImage, validateImageFile, deleteExpenseImage } from '@/utils';
 import { format } from 'date-fns';
 import { IconSelector } from './IconSelector';
+import { ImageViewerDialog } from '../common/ImageViewerDialog';
 import * as MuiIcons from '@mui/icons-material';
 import SearchIcon from '@mui/icons-material/Search';
 import AddIcon from '@mui/icons-material/Add';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import CloseIcon from '@mui/icons-material/Close';
+import AttachFileIcon from '@mui/icons-material/AttachFile';
+import DeleteIcon from '@mui/icons-material/Delete';
+import ImageIcon from '@mui/icons-material/Image';
+import PictureAsPdfIcon from '@mui/icons-material/PictureAsPdf';
+import { useAuth } from '@/contexts/AuthContext';
 
 interface ExpenseDialogProps {
   open: boolean;
@@ -59,6 +67,7 @@ export const ExpenseDialog = ({
 }: ExpenseDialogProps) => {
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
+  const { user } = useAuth();
 
   const defaultCategory = categories.length > 0 ? categories[0].id! : '';
 
@@ -90,6 +99,14 @@ export const ExpenseDialog = ({
   const [cardUSDRateText, setCardUSDRateText] = useState(String(usdRate));
   const [cardTaxText, setCardTaxText] = useState('0');
 
+  // Estados para imágenes adjuntas
+  const [attachments, setAttachments] = useState<string[]>([]);
+  const [uploadingImage, setUploadingImage] = useState(false);
+  const [imageError, setImageError] = useState<string | null>(null);
+  const [imageViewerOpen, setImageViewerOpen] = useState(false);
+  const [viewerImageIndex, setViewerImageIndex] = useState(0);
+  const [uploadedInSession, setUploadedInSession] = useState<string[]>([]); // URLs subidas en esta sesión
+
   const isTC = formData.item ? isCreditCard({ ...formData, id: expense?.id } as Expense) : false;
 
   useEffect(() => {
@@ -117,6 +134,10 @@ export const ExpenseDialog = ({
       setCardTotalUSDText(String(usdValue).replace('.', ','));
       setCardUSDRateText(String(rateValue).replace('.', ','));
       setCardTaxText(String(taxValue).replace('.', ','));
+
+      // Cargar attachments si existen
+      setAttachments(expense.attachments || []);
+      setImageError(null);
     } else {
       const newDefaultCategory = categories.length > 0 ? categories[0].id! : '';
       setFormData({
@@ -140,11 +161,103 @@ export const ExpenseDialog = ({
       setCardTotalUSDText('0');
       setCardUSDRateText(String(usdRate).replace('.', ','));
       setCardTaxText('0');
+      setAttachments([]);
+      setImageError(null);
+      setUploadedInSession([]); // Resetear archivos subidos en sesión
     }
   }, [expense, selectedMonth, selectedYear, categories, usdRate]);
 
   const handleSelectIcon = (iconName: string) => {
     setFormData({ ...formData, icon: iconName });
+  };
+
+  const isPDF = (url: string) => {
+    // Decodificar la URL para detectar .pdf en el path
+    const decodedUrl = decodeURIComponent(url);
+    return decodedUrl.toLowerCase().includes('.pdf') ||
+           decodedUrl.includes('application/pdf') ||
+           url.includes('%2Fpdf') ||
+           url.includes('.pdf');
+  };
+
+  const getFileNameFromUrl = (url: string): string => {
+    try {
+      // Decodificar la URL
+      const decodedUrl = decodeURIComponent(url);
+
+      // Extraer el path del archivo (después de /o/ y antes de ?)
+      const matches = decodedUrl.match(/\/o\/(.+?)(\?|$)/);
+      if (matches && matches[1]) {
+        const fullPath = matches[1];
+        // Obtener solo el nombre del archivo (última parte después de /)
+        const fileName = fullPath.split('/').pop() || '';
+
+        // Remover el timestamp al inicio (formato: 1234567890_NombreArchivo.ext)
+        const withoutTimestamp = fileName.replace(/^\d+_/, '');
+
+        return withoutTimestamp || 'Archivo';
+      }
+
+      return 'Archivo';
+    } catch (error) {
+      return 'Archivo';
+    }
+  };
+
+  const handleImageUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file || !user) return;
+
+    setImageError(null);
+
+    // Validar archivo
+    const validation = validateImageFile(file);
+    if (!validation.valid) {
+      setImageError(validation.error || 'Error al validar la imagen');
+      return;
+    }
+
+    setUploadingImage(true);
+    try {
+      // Subir imagen a Firebase Storage
+      const imageUrl = await uploadExpenseImage(file, user.uid, expense?.id);
+
+      // Agregar URL a la lista de attachments
+      setAttachments(prev => [...prev, imageUrl]);
+
+      // Trackear que esta URL fue subida en esta sesión (para limpiar si se cancela)
+      setUploadedInSession(prev => [...prev, imageUrl]);
+    } catch (error) {
+      console.error('Error uploading image:', error);
+      setImageError('Error al subir la imagen. Por favor, intenta de nuevo.');
+    } finally {
+      setUploadingImage(false);
+      // Limpiar el input
+      event.target.value = '';
+    }
+  };
+
+  const handleRemoveImage = async (imageUrl: string) => {
+    try {
+      // Intentar eliminar de Firebase Storage
+      await deleteExpenseImage(imageUrl);
+    } catch (error: any) {
+      // Si el archivo no existe (ya fue borrado manualmente), no es un error real
+      if (error?.code === 'storage/object-not-found') {
+        console.log('Archivo ya no existe en Storage, removiendo solo la referencia');
+      } else {
+        // Si es otro tipo de error, mostrarlo
+        console.error('Error removing image:', error);
+        setImageError('Error al eliminar la imagen');
+        return; // Salir sin remover de la lista si hubo un error real
+      }
+    }
+
+    // Eliminar de la lista local (tanto si se eliminó como si ya no existía)
+    setAttachments(prev => prev.filter(url => url !== imageUrl));
+
+    // Eliminar de uploadedInSession también
+    setUploadedInSession(prev => prev.filter(url => url !== imageUrl));
   };
 
   const SelectedIconComponent = formData.icon ? (MuiIcons as any)[formData.icon] : null;
@@ -176,14 +289,43 @@ export const ExpenseDialog = ({
       cleanedData.importe = cardFinalTotal;
     }
 
+    // Incluir attachments (o null si está vacío para eliminar el campo en Firestore)
+    if (attachments.length > 0) {
+      cleanedData.attachments = attachments;
+    } else if (expense?.attachments) {
+      // Si el gasto tenía attachments antes pero ahora está vacío, eliminarlos explícitamente
+      // Usar null (no undefined) para que deleteField() se active en useExpenses
+      cleanedData.attachments = null as any;
+    }
+
+    // Limpiar la lista de archivos subidos en esta sesión (ya se guardaron)
+    setUploadedInSession([]);
+
     onSave(cleanedData);
+    onClose();
+  };
+
+  const handleCancel = async () => {
+    // Si hay archivos subidos en esta sesión, eliminarlos de Storage
+    if (uploadedInSession.length > 0) {
+      try {
+        await Promise.all(
+          uploadedInSession.map(url => deleteExpenseImage(url))
+        );
+      } catch (error) {
+        console.error('Error cleaning up uploaded files:', error);
+      }
+    }
+
+    // Limpiar estados y cerrar
+    setUploadedInSession([]);
     onClose();
   };
 
   return (
     <Dialog
       open={open}
-      onClose={onClose}
+      onClose={handleCancel}
       fullScreen={isMobile}
       maxWidth="md"
       fullWidth
@@ -199,7 +341,7 @@ export const ExpenseDialog = ({
         {isMobile && (
           <IconButton
             aria-label="Cerrar"
-            onClick={onClose}
+            onClick={handleCancel}
             edge="end"
             sx={{
               position: 'absolute',
@@ -533,11 +675,106 @@ export const ExpenseDialog = ({
             onChange={(e) => setFormData({ ...formData, comment: e.target.value || undefined })}
             placeholder="Agrega un comentario sobre este gasto..."
           />
+
+          {/* Sección de adjuntar archivos */}
+          <Box>
+            <Typography variant="body2" sx={{ mb: 1, fontWeight: 600 }}>
+              Adjuntar comprobantes (Imágenes o PDFs)
+            </Typography>
+
+            {imageError && (
+              <Alert severity="error" sx={{ mb: 2 }} onClose={() => setImageError(null)}>
+                {imageError}
+              </Alert>
+            )}
+
+            {/* Botón para subir archivo */}
+            <Button
+              variant="outlined"
+              component="label"
+              startIcon={uploadingImage ? <CircularProgress size={20} /> : <AttachFileIcon />}
+              disabled={uploadingImage}
+              fullWidth={isMobile}
+              sx={{ mb: 2 }}
+            >
+              {uploadingImage ? 'Subiendo archivo...' : 'Subir archivo'}
+              <input
+                type="file"
+                hidden
+                accept="image/*,application/pdf"
+                onChange={handleImageUpload}
+                disabled={uploadingImage}
+              />
+            </Button>
+
+            {/* Mostrar archivos adjuntos */}
+            {attachments.length > 0 && (
+              <Stack spacing={1}>
+                {attachments.map((url, index) => {
+                  const isFilePDF = isPDF(url);
+                  return (
+                    <Box
+                      key={index}
+                      sx={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: 1,
+                        p: 1,
+                        border: '1px solid',
+                        borderColor: 'divider',
+                        borderRadius: 1,
+                      }}
+                    >
+                      {isFilePDF ? (
+                        <PictureAsPdfIcon color="error" />
+                      ) : (
+                        <ImageIcon color="primary" />
+                      )}
+                      <Typography
+                        variant="body2"
+                        sx={{
+                          flex: 1,
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                          whiteSpace: 'nowrap',
+                          cursor: 'pointer',
+                          '&:hover': { textDecoration: 'underline' }
+                        }}
+                        onClick={() => {
+                          setViewerImageIndex(index);
+                          setImageViewerOpen(true);
+                        }}
+                        title={getFileNameFromUrl(url)}
+                      >
+                        {getFileNameFromUrl(url)}
+                      </Typography>
+                    <Chip
+                      label="Ver"
+                      size="small"
+                      onClick={() => {
+                        setViewerImageIndex(index);
+                        setImageViewerOpen(true);
+                      }}
+                      sx={{ cursor: 'pointer' }}
+                    />
+                    <IconButton
+                      size="small"
+                      color="error"
+                      onClick={() => handleRemoveImage(url)}
+                    >
+                      <DeleteIcon fontSize="small" />
+                    </IconButton>
+                  </Box>
+                  );
+                })}
+              </Stack>
+            )}
+          </Box>
         </Stack>
       </DialogContent>
 
       <DialogActions sx={{ px: 3, pb: isMobile ? 2 : 2 }}>
-        <Button onClick={onClose} fullWidth={isMobile}>
+        <Button onClick={handleCancel} fullWidth={isMobile}>
           Cancelar
         </Button>
         <Button onClick={handleSubmit} variant="contained" fullWidth={isMobile}>
@@ -550,6 +787,13 @@ export const ExpenseDialog = ({
         selectedIcon={formData.icon}
         onClose={() => setIconSelectorOpen(false)}
         onSelect={handleSelectIcon}
+      />
+
+      <ImageViewerDialog
+        open={imageViewerOpen}
+        images={attachments}
+        initialIndex={viewerImageIndex}
+        onClose={() => setImageViewerOpen(false)}
       />
     </Dialog>
   );

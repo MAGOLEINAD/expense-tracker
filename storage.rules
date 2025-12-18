@@ -1,0 +1,18 @@
+rules_version = '2';
+
+// Reglas de seguridad para Firebase Storage
+service firebase.storage {
+  match /b/{bucket}/o {
+    // Reglas para las imágenes de gastos
+    match /expenses/{userId}/{allPaths=**} {
+      // Permitir lectura si el usuario está autenticado y es el dueño
+      allow read: if request.auth != null && request.auth.uid == userId;
+
+      // Permitir escritura si el usuario está autenticado y es el dueño
+      allow write: if request.auth != null && request.auth.uid == userId;
+
+      // Permitir eliminación si el usuario está autenticado y es el dueño
+      allow delete: if request.auth != null && request.auth.uid == userId;
+    }
+  }
+}

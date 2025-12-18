@@ -21,6 +21,7 @@ export interface Expense {
   month: number; // 1-12
   year: number;
   comment?: string; // Optional comment
+  attachments?: string[]; // URLs of attached images (screenshots, receipts, etc.)
   debt?: number; // Optional pending debt amount
   order?: number; // Order within category for drag-and-drop sorting
   linkedToCardId?: string; // ID of the credit card expense this is linked to
