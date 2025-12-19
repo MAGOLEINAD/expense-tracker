@@ -281,9 +281,11 @@ export const CardLinkDialog = ({
                   }
                 }}
                 onFocus={(e) => e.target.select()}
-                inputProps={{ inputMode: 'decimal' }}
-                InputProps={{
-                  startAdornment: <Typography sx={{ mr: 0.5, color: 'text.secondary' }}>$</Typography>,
+                slotProps={{
+                  htmlInput: { inputMode: 'decimal' },
+                  input: {
+                    startAdornment: <Typography sx={{ mr: 0.5, color: 'text.secondary' }}>$</Typography>,
+                  }
                 }}
               />
               <TextField
@@ -304,9 +306,11 @@ export const CardLinkDialog = ({
                   }
                 }}
                 onFocus={(e) => e.target.select()}
-                inputProps={{ inputMode: 'decimal' }}
-                InputProps={{
-                  startAdornment: <Typography sx={{ mr: 0.5, color: 'text.secondary' }}>USD</Typography>,
+                slotProps={{
+                  htmlInput: { inputMode: 'decimal' },
+                  input: {
+                    startAdornment: <Typography sx={{ mr: 0.5, color: 'text.secondary' }}>USD</Typography>,
+                  }
                 }}
               />
               <Box sx={{ display: 'flex', gap: 0.5, alignItems: 'flex-end' }}>
@@ -329,9 +333,11 @@ export const CardLinkDialog = ({
                     }
                   }}
                   onFocus={(e) => e.target.select()}
-                  inputProps={{ inputMode: 'decimal' }}
-                  InputProps={{
-                    startAdornment: <Typography sx={{ mr: 0.5, color: 'text.secondary' }}>$</Typography>,
+                  slotProps={{
+                    htmlInput: { inputMode: 'decimal' },
+                    input: {
+                      startAdornment: <Typography sx={{ mr: 0.5, color: 'text.secondary' }}>$</Typography>,
+                    }
                   }}
                 />
                 <Tooltip title="Recargar cotización de la API" arrow>
@@ -366,9 +372,11 @@ export const CardLinkDialog = ({
                   }
                 }}
                 onFocus={(e) => e.target.select()}
-                inputProps={{ inputMode: 'decimal' }}
-                InputProps={{
-                  startAdornment: <Typography sx={{ mr: 0.5, color: 'text.secondary' }}>$</Typography>,
+                slotProps={{
+                  htmlInput: { inputMode: 'decimal' },
+                  input: {
+                    startAdornment: <Typography sx={{ mr: 0.5, color: 'text.secondary' }}>$</Typography>,
+                  }
                 }}
               />
             </Box>
@@ -462,7 +470,7 @@ export const CardLinkDialog = ({
                           checked={isSelected}
                           tabIndex={-1}
                           disableRipple
-                          inputProps={{ 'aria-labelledby': labelId }}
+                          slotProps={{ input: { 'aria-labelledby': labelId } }}
                         />
                       </ListItemIcon>
                       <ListItemText

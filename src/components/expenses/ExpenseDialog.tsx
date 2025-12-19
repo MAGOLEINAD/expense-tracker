@@ -262,6 +262,24 @@ export const ExpenseDialog = ({
 
   const SelectedIconComponent = formData.icon ? (MuiIcons as any)[formData.icon] : null;
 
+  // Función para validar que el año tenga exactamente 4 dígitos
+  const validateDateInput = (dateValue: string): string => {
+    // Formato esperado: YYYY-MM-DD
+    if (!dateValue) return dateValue;
+
+    const parts = dateValue.split('-');
+    if (parts.length !== 3) return dateValue;
+
+    const [year, month, day] = parts;
+
+    // Limitar el año a 4 dígitos
+    if (year && year.length > 4) {
+      return `${year.substring(0, 4)}-${month}-${day}`;
+    }
+
+    return dateValue;
+  };
+
   const handleSubmit = () => {
     const cleanedData: Partial<Expense> = {};
     Object.keys(formData).forEach((key) => {
@@ -393,12 +411,14 @@ export const ExpenseDialog = ({
                 label="Item"
                 value={formData.item}
                 onChange={(e) => setFormData({ ...formData, item: e.target.value })}
-                InputProps={{
-                  startAdornment: SelectedIconComponent && (
-                    <InputAdornment position="start">
-                      <SelectedIconComponent sx={{ color: formData.iconColor || '#2196f3' }} />
-                    </InputAdornment>
-                  ),
+                slotProps={{
+                  input: {
+                    startAdornment: SelectedIconComponent && (
+                      <InputAdornment position="start">
+                        <SelectedIconComponent sx={{ color: formData.iconColor || '#2196f3' }} />
+                      </InputAdornment>
+                    ),
+                  }
                 }}
               />
               <IconButton onClick={() => setIconSelectorOpen(true)} color="primary" sx={{ flexShrink: 0 }}>
@@ -410,7 +430,7 @@ export const ExpenseDialog = ({
                   value={formData.iconColor || '#2196f3'}
                   onChange={(e) => setFormData({ ...formData, iconColor: e.target.value })}
                   sx={{ width: 72, flexShrink: 0 }}
-                  InputLabelProps={{ shrink: true }}
+                  slotProps={{ inputLabel: { shrink: true } }}
                 />
               )}
             </Stack>
@@ -448,17 +468,29 @@ export const ExpenseDialog = ({
               fullWidth
               type="date"
               label="Vencimiento"
-              value={formData.vto}
-              onChange={(e) => setFormData({ ...formData, vto: e.target.value })}
-              InputLabelProps={{ shrink: true }}
+              value={formData.vto === '-' ? '' : formData.vto}
+              onChange={(e) => {
+                const validatedDate = validateDateInput(e.target.value);
+                setFormData({ ...formData, vto: validatedDate });
+              }}
+              slotProps={{
+                inputLabel: { shrink: true },
+                htmlInput: { max: '9999-12-31' }
+              }}
             />
             <TextField
               fullWidth
               type="date"
               label="Fecha de Pago"
-              value={formData.fechaPago}
-              onChange={(e) => setFormData({ ...formData, fechaPago: e.target.value })}
-              InputLabelProps={{ shrink: true }}
+              value={formData.fechaPago === '-' ? '' : formData.fechaPago}
+              onChange={(e) => {
+                const validatedDate = validateDateInput(e.target.value);
+                setFormData({ ...formData, fechaPago: validatedDate });
+              }}
+              slotProps={{
+                inputLabel: { shrink: true },
+                htmlInput: { max: '9999-12-31' }
+              }}
             />
             <TextField
               select
@@ -506,9 +538,11 @@ export const ExpenseDialog = ({
                     }
                   }}
                   onFocus={(e) => e.target.select()}
-                  inputProps={{ inputMode: 'decimal' }}
-                  InputProps={{
-                    startAdornment: <Typography sx={{ mr: 0.5, color: 'text.secondary' }}>$</Typography>,
+                  slotProps={{
+                    htmlInput: { inputMode: 'decimal' },
+                    input: {
+                      startAdornment: <Typography sx={{ mr: 0.5, color: 'text.secondary' }}>$</Typography>,
+                    }
                   }}
                 />
                 <TextField
@@ -528,9 +562,11 @@ export const ExpenseDialog = ({
                     }
                   }}
                   onFocus={(e) => e.target.select()}
-                  inputProps={{ inputMode: 'decimal' }}
-                  InputProps={{
-                    startAdornment: <Typography sx={{ mr: 0.5, color: 'text.secondary' }}>USD</Typography>,
+                  slotProps={{
+                    htmlInput: { inputMode: 'decimal' },
+                    input: {
+                      startAdornment: <Typography sx={{ mr: 0.5, color: 'text.secondary' }}>USD</Typography>,
+                    }
                   }}
                 />
 
@@ -553,9 +589,11 @@ export const ExpenseDialog = ({
                       }
                     }}
                     onFocus={(e) => e.target.select()}
-                    inputProps={{ inputMode: 'decimal' }}
-                    InputProps={{
-                      startAdornment: <Typography sx={{ mr: 0.5, color: 'text.secondary' }}>$</Typography>,
+                    slotProps={{
+                      htmlInput: { inputMode: 'decimal' },
+                      input: {
+                        startAdornment: <Typography sx={{ mr: 0.5, color: 'text.secondary' }}>$</Typography>,
+                      }
                     }}
                   />
                   <Tooltip title="Recargar cotización de la API" arrow>
@@ -590,9 +628,11 @@ export const ExpenseDialog = ({
                     }
                   }}
                   onFocus={(e) => e.target.select()}
-                  inputProps={{ inputMode: 'decimal' }}
-                  InputProps={{
-                    startAdornment: <Typography sx={{ mr: 0.5, color: 'text.secondary' }}>$</Typography>,
+                  slotProps={{
+                    htmlInput: { inputMode: 'decimal' },
+                    input: {
+                      startAdornment: <Typography sx={{ mr: 0.5, color: 'text.secondary' }}>$</Typography>,
+                    }
                   }}
                 />
               </Box>
@@ -641,7 +681,7 @@ export const ExpenseDialog = ({
                     }
                   }
                 }}
-                inputProps={{ inputMode: 'decimal' }}
+                slotProps={{ htmlInput: { inputMode: 'decimal' } }}
               />
               <TextField
                 select
@@ -662,7 +702,7 @@ export const ExpenseDialog = ({
             label="Deuda pendiente (opcional)"
             value={formData.debt || ''}
             onChange={(e) => setFormData({ ...formData, debt: e.target.value ? Number(e.target.value) : undefined })}
-            inputProps={{ step: '0.01', min: 0 }}
+            slotProps={{ htmlInput: { step: '0.01', min: 0 } }}
             helperText="Ingresa el monto que aún debes de este gasto"
           />
 

@@ -260,6 +260,36 @@ export const ExpenseTable = ({ expenses, categories, onEdit, onUpdate, onDelete,
     setEditValue(value);
   };
 
+  // Función helper para manejar cambios en campos de fecha preservando la posición del cursor
+  const handleDateInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    const input = e.target as HTMLInputElement;
+    const inputValue = e.target.value;
+    const cursorPos = input.selectionStart || 0;
+
+    // Si el usuario está borrando, permitir sin formatear
+    if (inputValue.length < editValue.length) {
+      cursorPositionRef.current = cursorPos;
+      shouldRestoreCursor.current = true;
+      setEditValue(inputValue);
+      return;
+    }
+
+    // Calcular la longitud antes del formateo
+    const lengthBefore = inputValue.length;
+
+    // Usar formatDateInput para auto-formatear y auto-completar
+    const { formatted } = formatDateInput(inputValue);
+
+    // Calcular cuántos caracteres se agregaron por el formateo (ej: las barras "/")
+    const lengthAfter = formatted.length;
+    const addedChars = lengthAfter - lengthBefore;
+
+    // Ajustar la posición del cursor para incluir los caracteres agregados
+    cursorPositionRef.current = cursorPos + addedChars;
+    shouldRestoreCursor.current = true;
+    setEditValue(formatted);
+  };
+
   // Inicializar expandedCategories con todas las categorías
   useEffect(() => {
     setExpandedCategories(new Set(categories.map(cat => cat.id!)));
@@ -1215,17 +1245,7 @@ export const ExpenseTable = ({ expenses, categories, onEdit, onUpdate, onDelete,
                               <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
                                 <TextField
                                   value={editValue}
-                                  onChange={(e) => {
-                                    const input = e.target.value;
-                                    // Si el usuario está borrando, permitir
-                                    if (input.length < editValue.length) {
-                                      setEditValue(input);
-                                      return;
-                                    }
-                                    // Usar formatDateInput para auto-formatear y auto-completar
-                                    const { formatted } = formatDateInput(input);
-                                    setEditValue(formatted);
-                                  }}
+                                  onChange={handleDateInputChange}
                                   onBlur={(e) => handleCellBlur(expense, e)}
                                   onKeyDown={(e) => handleKeyDown(e, expense)}
                                   onDoubleClick={(e) => e.stopPropagation()}
@@ -1268,17 +1288,7 @@ export const ExpenseTable = ({ expenses, categories, onEdit, onUpdate, onDelete,
                               <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
                                 <TextField
                                   value={editValue}
-                                  onChange={(e) => {
-                                    const input = e.target.value;
-                                    // Si el usuario está borrando, permitir
-                                    if (input.length < editValue.length) {
-                                      setEditValue(input);
-                                      return;
-                                    }
-                                    // Usar formatDateInput para auto-formatear y auto-completar
-                                    const { formatted } = formatDateInput(input);
-                                    setEditValue(formatted);
-                                  }}
+                                  onChange={handleDateInputChange}
                                   onBlur={(e) => handleCellBlur(expense, e)}
                                   onKeyDown={(e) => handleKeyDown(e, expense)}
                                   onDoubleClick={(e) => e.stopPropagation()}

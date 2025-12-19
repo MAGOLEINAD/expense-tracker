@@ -32,3 +32,6 @@ dist-ssr
 .firebase
 .firebaserc
 firebase-debug.log
+
+# Claude Code
+.claude

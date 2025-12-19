@@ -51,20 +51,53 @@ export const generateYearOptions = (startYear: number = 2020): number[] => {
  * @returns Objeto con el texto formateado y la fecha completa en formato YYYY-MM-DD
  */
 export const formatDateInput = (value: string): { formatted: string; isoDate: string | null } => {
+  // Auto-completar día con 0 si escribe un solo dígito + "/" (ej: "3/" -> "03/")
+  let processedValue = value;
+  if (/^[1-9]\//.test(value)) {
+    processedValue = '0' + value;
+  }
+
+  // Auto-completar mes con 0 si escribe DD/ + un solo dígito + "/" (ej: "03/1/" -> "03/01/")
+  if (/^(\d{2})\/([1-9])\/$/.test(processedValue)) {
+    processedValue = processedValue.replace(/^(\d{2})\/([1-9])\/$/, '$1/0$2/');
+  }
+
   // Remover todo lo que no sea número
-  const numbers = value.replace(/\D/g, '');
+  const numbers = processedValue.replace(/\D/g, '');
 
   let formatted = '';
   let isoDate = null;
 
   // Formatear DD/MM/YYYY con barras automáticas
   if (numbers.length > 0) {
-    formatted = numbers.substring(0, 2);
+    // Limitar día entre 01 y 31
+    let day = numbers.substring(0, 2);
+    const dayNum = parseInt(day);
+    if (dayNum > 31) {
+      day = '31';
+    } else if (dayNum === 0 && day.length === 2) {
+      day = '01';
+    }
+    formatted = day;
+
     if (numbers.length >= 3) {
-      formatted += '/' + numbers.substring(2, 4);
+      // Limitar mes entre 01 y 12
+      let month = numbers.substring(2, 4);
+      const monthNum = parseInt(month);
+      if (monthNum > 12) {
+        month = '12';
+      } else if (monthNum === 0 && month.length === 2) {
+        month = '01';
+      }
+      formatted += '/' + month;
     }
     if (numbers.length >= 5) {
-      formatted += '/' + numbers.substring(4, 8);
+      // Limitar año a máximo 2050
+      let year = numbers.substring(4, 8);
+      if (year.length === 4 && parseInt(year) > 2050) {
+        year = '2050';
+      }
+      formatted += '/' + year;
     }
 
     // Auto-completar año si solo hay DD/MM (4 dígitos)
@@ -78,7 +111,7 @@ export const formatDateInput = (value: string): { formatted: string; isoDate: st
       const monthNum = parseInt(month);
 
       if (dayNum >= 1 && dayNum <= 31 && monthNum >= 1 && monthNum <= 12) {
-        isoDate = `${currentYear}-${month}-${day}`;
+        isoDate = `${currentYear}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
       }
     } else if (numbers.length >= 8) {
       // Convertir DD/MM/YYYY a YYYY-MM-DD para el estado interno
@@ -89,9 +122,10 @@ export const formatDateInput = (value: string): { formatted: string; isoDate: st
       // Validar fecha
       const dayNum = parseInt(day);
       const monthNum = parseInt(month);
+      const yearNum = parseInt(year);
 
-      if (dayNum >= 1 && dayNum <= 31 && monthNum >= 1 && monthNum <= 12) {
-        isoDate = `${year}-${month}-${day}`;
+      if (dayNum >= 1 && dayNum <= 31 && monthNum >= 1 && monthNum <= 12 && yearNum <= 2050) {
+        isoDate = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
       }
     }
   }

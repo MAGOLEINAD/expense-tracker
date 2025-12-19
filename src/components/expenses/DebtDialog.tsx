@@ -85,15 +85,17 @@ export const DebtDialog = ({ open, initialDebt = 0, onClose, onSave }: DebtDialo
             }}
             error={!!error}
             helperText={error || 'Ingresa el monto que aún debes'}
-            InputProps={{
-              startAdornment: (
-                <InputAdornment position="start">
-                  <AttachMoneyIcon sx={{ color: '#ef4444' }} />
-                </InputAdornment>
-              ),
-            }}
             autoFocus
-            inputProps={{ min: 0, step: 0.01 }}
+            slotProps={{
+              htmlInput: { min: 0, step: 0.01 },
+              input: {
+                startAdornment: (
+                  <InputAdornment position="start">
+                    <AttachMoneyIcon sx={{ color: '#ef4444' }} />
+                  </InputAdornment>
+                ),
+              }
+            }}
           />
         </Box>
       </DialogContent>

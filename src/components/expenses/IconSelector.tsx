@@ -82,12 +82,14 @@ export const IconSelector = ({ open, selectedIcon, onClose, onSelect }: IconSele
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           sx={{ mb: 2 }}
-          InputProps={{
-            startAdornment: (
-              <InputAdornment position="start">
-                <SearchIcon />
-              </InputAdornment>
-            ),
+          slotProps={{
+            input: {
+              startAdornment: (
+                <InputAdornment position="start">
+                  <SearchIcon />
+                </InputAdornment>
+              ),
+            }
           }}
           autoFocus
         />
